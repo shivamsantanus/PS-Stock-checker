@@ -65,12 +65,31 @@ export class StockChecker {
         locale: "en-US",
         extraHTTPHeaders: COMMON_HEADERS,
       });
+
+      if (target.cookies?.length) {
+        await context.addCookies(target.cookies.map((c) => ({ ...c, path: c.path ?? "/" })));
+      }
+
       const page = await context.newPage();
 
       await page.goto(target.url, {
         waitUntil: "domcontentloaded",
         timeout: config.requestTimeoutMs,
       });
+
+      // Sites that gate availability behind a delivery pincode/address picker
+      // (most quick-commerce apps) need that picker driven before the real
+      // stock selector shows up.
+      for (const step of target.preActions ?? []) {
+        if (step.action === "fill") {
+          await page.fill(step.selector, step.value ?? "");
+        } else {
+          await page.click(step.selector);
+        }
+        if (step.waitAfterMs) {
+          await page.waitForTimeout(step.waitAfterMs);
+        }
+      }
 
       // Wait specifically for the availability element rather than a fixed
       // sleep - this is both faster on average and more resilient to

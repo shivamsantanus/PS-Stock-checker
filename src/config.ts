@@ -3,12 +3,9 @@ import path from "path";
 
 dotenv.config();
 
-function requireEnv(name: string): string {
+function optionalEnv(name: string): string | undefined {
   const value = process.env[name];
-  if (!value || value.trim().length === 0) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
+  return value && value.trim().length > 0 ? value : undefined;
 }
 
 function optionalInt(name: string, fallback: number): number {
@@ -25,7 +22,11 @@ function optionalBool(name: string, fallback: boolean): boolean {
 }
 
 export const config = {
-  discordWebhookUrl: requireEnv("DISCORD_WEBHOOK_URL"),
+  // Both notification channels are optional individually, but at least one
+  // must be configured - validated at startup in index.ts.
+  discordWebhookUrl: optionalEnv("DISCORD_WEBHOOK_URL"),
+  telegramBotToken: optionalEnv("TELEGRAM_BOT_TOKEN"),
+  telegramChatId: optionalEnv("TELEGRAM_CHAT_ID"),
 
   checkIntervalMinutes: optionalInt("CHECK_INTERVAL_MINUTES", 10),
   jitterSeconds: optionalInt("JITTER_SECONDS", 30),

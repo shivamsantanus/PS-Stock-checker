@@ -3,7 +3,7 @@ import { TARGETS } from "./targets";
 import { logger } from "./logger";
 import { StateManager } from "./stateManager";
 import { StockChecker } from "./scraper";
-import { notifyBackInStock, notifyError } from "./notifier";
+import { hasAnyChannelConfigured, notifyBackInStock, notifyError } from "./notifier";
 import { StockResult } from "./types";
 
 function sleep(ms: number): Promise<void> {
@@ -57,6 +57,12 @@ function nextIntervalMs(): number {
 }
 
 async function main(): Promise<void> {
+  if (!hasAnyChannelConfigured()) {
+    throw new Error(
+      "No notification channel configured - set DISCORD_WEBHOOK_URL and/or TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID in .env"
+    );
+  }
+
   const state = new StateManager();
   const checker = new StockChecker();
 
