@@ -251,6 +251,17 @@ export const TARGETS: Target[] = [
       // actually updates delivery location and re-renders availability -
       // confirmed live by pincode 147002 flipping the CTA from
       // "Add to Cart" to "Notify Me when back in stock".
+      //
+      // FALSE-POSITIVE FOUND AND FIXED 2026-07-08: a live run reported
+      // IN_STOCK for Gurugram/Bhubaneswar/Dehradun that had already reverted
+      // to OUT_OF_STOCK by the time it was checked manually. Root-caused by
+      // polling the buy-box every 300ms after clicking the address
+      // suggestion: the DOM keeps showing the STALE "Add to Cart" text from
+      // the default/no-pincode view for ~2.2s before Zepto actually
+      // re-fetches and re-renders availability for the new address. The
+      // previous 3500ms waitAfterMs had thin margin over that and could
+      // read mid-transition on a slower connection (e.g. a GitHub Actions
+      // runner). Bumped to 7000ms (~3x the observed transition time) below.
       id: `zepto-ps5-${pincode}`,
       label: `Zepto - ${city} ${pincode}`,
       url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
@@ -259,8 +270,9 @@ export const TARGETS: Target[] = [
         // Opens the "Select Location" modal from the header.
         { action: "click", selector: "[data-testid='user-address']" },
         { action: "fill", selector: "[data-testid='address-search-input'] input", value: pincode, waitAfterMs: 2000 },
-        // Clicks the first suggestion in the results list.
-        { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 3500 },
+        // Clicks the first suggestion in the results list. waitAfterMs is
+        // intentionally generous - see the false-positive note above.
+        { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
       ],
       // Scoped to the buy-box only (title/price/CTA) - confirmed NOT to
       // include the page's global nav/footer, which also lists city names
@@ -268,6 +280,26 @@ export const TARGETS: Target[] = [
       // on naive text matching. Like Flipkart's obfuscated classes, this is
       // a hashed CSS-module class name that may rotate on Zepto redeploys -
       // re-verify if this target starts erroring out.
+      selector: ".KQfnF.ckhcV",
+      outOfStockValues: ["notify me", "out of stock"],
+      inStockValues: ["add to cart"],
+    },
+    {
+      // Same product family/site behavior as zepto-ps5-* above (standard
+      // edition) - selectors, location-picker flow, and the 7000ms
+      // false-positive-avoidance wait are identical, just a different
+      // product page. Confirmed live 2026-07-08 that this page uses the
+      // same buy-box class and correctly flips to "Notify Me when back in
+      // stock" once a pincode is applied.
+      id: `zepto-ps5-digital-${pincode}`,
+      label: `Zepto - ${city} ${pincode} (Digital Edition)`,
+      url: "https://www.zepto.com/pn/playstation-5-console-digital/pvid/4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
+      strategy: "dom",
+      preActions: [
+        { action: "click", selector: "[data-testid='user-address']" },
+        { action: "fill", selector: "[data-testid='address-search-input'] input", value: pincode, waitAfterMs: 2000 },
+        { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
+      ],
       selector: ".KQfnF.ckhcV",
       outOfStockValues: ["notify me", "out of stock"],
       inStockValues: ["add to cart"],
