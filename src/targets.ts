@@ -20,25 +20,45 @@ import { Target } from "./types";
  *   reliable target in this file. Sony doesn't sell PS5 hardware through its
  *   own sony.co.in store in India, only through retail partners like this.
  *
- * Amazon.in - CONFIRMED SELECTOR, national only, medium confidence.
+ * Amazon.in - CONFIRMED SELECTOR, medium confidence.
  *   `#availability` reliably showed "Currently unavailable." live. Amazon's
  *   location-change modal (`#nav-global-location-popover-link` ->
  *   `#GLUXZipUpdateInput` -> `#GLUXZipUpdate`) would not actually apply a new
  *   pincode under headless Playwright in testing - its bot detection appears
- *   to specifically obstruct that interactive flow - so this checks whatever
- *   location Amazon auto-detects from the machine's IP, not a chosen city.
+ *   to specifically obstruct that interactive flow.
  *
- * Flipkart - CONFIRMED WORKING via structured data, national only, high
- *   confidence. The visible page uses auto-generated/rotating CSS class
- *   names (e.g. `css-146c3p1`) with no stable selector to grab - but every
- *   product page also embeds a `<script type="application/ld+json"
- *   id="jsonLD">` block (schema.org Product markup, kept stable on purpose
- *   for Google Shopping/SEO) containing `offers.availability`:
- *   "https://schema.org/InStock" or ".../OutOfStock". Confirmed live,
- *   present in the raw server-rendered HTML with no JS execution needed.
- *   This sidesteps the obfuscated-class problem entirely by reading a data
- *   contract Flipkart has an external incentive to keep stable, rather than
- *   its internal, freely-changing visual markup.
+ * Flipkart - CONFIRMED WORKING via structured data, high confidence for
+ *   "is this in stock anywhere," NOT for "is this deliverable to me."
+ *   The visible page uses auto-generated/rotating CSS class names (e.g.
+ *   `css-146c3p1`) with no stable selector to grab - but every product page
+ *   also embeds a `<script type="application/ld+json" id="jsonLD">` block
+ *   (schema.org Product markup, kept stable on purpose for Google
+ *   Shopping/SEO) containing `offers.availability`: "https://schema.org/
+ *   InStock" or ".../OutOfStock". Confirmed live, present in the raw
+ *   server-rendered HTML with no JS execution needed - sidesteps the
+ *   obfuscated-class problem by reading a data contract Flipkart has an
+ *   external incentive to keep stable. HOWEVER this field reflects whether
+ *   ANY seller has stock, not whether a seller can deliver to any specific
+ *   address - confirmed live when a real alert fired for "InStock" while
+ *   the page separately showed no seller servicing the user's actual
+ *   pincode. Flipkart's real delivery-location picker (like Amazon's) does
+ *   not respond to headless automation - typing a pincode triggers no
+ *   suggestions and no network call at all, and there's no location cookie
+ *   to set directly as a shortcut either.
+ *
+ * IMPORTANT for Amazon and Flipkart specifically: neither exposes a
+ * scriptable way to check a chosen city/pincode - both default to whatever
+ * location their server resolves from the request's IP address. That means
+ * accuracy for "is this available near me" depends entirely on WHERE this
+ * script's network connection actually is:
+ *   - Run it from your own home connection in the city you care about -
+ *     the default location will genuinely reflect your area.
+ *   - Do NOT rely on the included GitHub Actions workflow
+ *     (.github/workflows/stock-check.yml) for these two targets - GitHub's
+ *     hosted runners execute from their own cloud datacenters (not India),
+ *     so the resolved location would be arbitrary, not yours. Sony Center
+ *     is unaffected by this (it's a national sale, not location-gated) and
+ *     is fine to run from GitHub Actions.
  *
  * Excluded after live testing - not shipped, to avoid pretending confidence
  * that testing disproved:
@@ -75,7 +95,10 @@ export const TARGETS: Target[] = [
   },
   {
     id: "amazon-national",
-    label: "Amazon.in - PS5 console (national, no per-city override)",
+    // IMPORTANT: "national" here means "wherever this script's network
+    // connection resolves to," not a chosen city - see the IMPORTANT note
+    // above this array for why that matters and how to run it correctly.
+    label: "Amazon.in - PS5 console (location = wherever this script runs from)",
     url: "https://www.amazon.in/Sony-CFI-1008A01R-PlayStation-5-console/dp/B08FV5GC28",
     strategy: "dom",
     selector: "#availability",
@@ -84,7 +107,7 @@ export const TARGETS: Target[] = [
   },
   {
     id: "flipkart-national",
-    label: "Flipkart - PS5 console (national, via structured data)",
+    label: "Flipkart - PS5 console (location = wherever this script runs from)",
     url: "https://www.flipkart.com/sony-playstation5-console-slim-cfi-2008a01x-1024-gb/p/itm89489e2adcd2c",
     strategy: "dom",
     selector: "script#jsonLD",
@@ -98,12 +121,14 @@ export const TARGETS: Target[] = [
   // Unlike the mainstream retailers above, these DO gate real-time stock
   // behind a delivery pincode/address (they run dark-store fulfillment, not
   // one national inventory pool) - so per-city checks are meaningful here,
-  // via `preActions` driving each site's location picker. These were NOT
-  // live-verified with the same rigor as the targets above - every
-  // id/selector/pincode below is a PLACEHOLDER. Open the real site in a
-  // browser, inspect the location picker and stock badge with DevTools, and
-  // replace these before running against a live site. See README.md ->
-  // "Quick-commerce platforms" for per-platform feasibility notes.
+  // via `preActions` driving each site's location picker. Blinkit is now
+  // CONFIRMED WORKING (see its own comment below) - the other four
+  // (BigBasket, Flipkart Minutes, Instamart, Zepto) were NOT live-verified
+  // with the same rigor - every id/selector/pincode for those is still a
+  // PLACEHOLDER. Open the real site in a browser, inspect the location
+  // picker and stock badge with DevTools, and replace these before running
+  // against a live site. See README.md -> "Quick-commerce platforms" for
+  // per-platform feasibility notes.
 
   {
     id: "bigbasket-ps5-411001",
@@ -132,16 +157,30 @@ export const TARGETS: Target[] = [
     inStockValues: ["add to cart"],
   },
   {
+    // VERIFIED live 2026-07-08 against the real product page below - unlike
+    // Amazon/Flipkart, Blinkit's location picker DOES respond to headless
+    // automation: typing a pincode into the "Change Location" modal returns
+    // real suggestions, and clicking one actually updates the delivery
+    // address and re-renders availability for that pincode.
     id: "blinkit-ps5-110001",
     label: "Blinkit - Delhi 110001",
-    url: "https://blinkit.com/prn/example-product/prid/000000",
+    url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
     strategy: "dom",
     preActions: [
-      { action: "click", selector: "[data-pf='reset-location-search']" },
-      { action: "fill", selector: "input[name='select-locality']", value: "110001", waitAfterMs: 1200 },
-      { action: "click", selector: ".LocationSearchList__LocationLabel", waitAfterMs: 1500 },
+      // Opens the "Change Location" modal from the header.
+      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+      { action: "fill", selector: "input[name='select-locality']", value: "110001", waitAfterMs: 2000 },
+      // Clicks the first suggestion in the results list.
+      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
     ],
-    selector: "[data-pf='product-add-to-cart']",
+    // Scoped to the product's own info panel (breadcrumb/title/price/stock),
+    // NOT the whole page - this product page also renders "Top 10 products
+    // in this category" and "People also bought" carousels full of OTHER
+    // products' "ADD" buttons, so a page-wide selector would false-positive
+    // on those. `ProductWrapperRightSection` is a styled-components class
+    // that wraps only the real product's info column.
+    selector: "div[class*='ProductWrapperRightSection']",
+    outOfStockValues: ["out of stock"],
     inStockValues: ["add"],
   },
   {

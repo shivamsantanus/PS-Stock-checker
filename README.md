@@ -91,37 +91,63 @@ delivery location (see "Quick-commerce platforms" below):
 `targets.ts` ships with three tiers of confidence, based on live testing
 done while building this — not guesses:
 
-- **Sony Center (shopatsc.com) — verified, high confidence.** Sony's
-  official-branded retail chain runs on Shopify, which exposes a public
-  `/products/<handle>.js` endpoint with a clean `available: true/false`
+- **Sony Center (shopatsc.com) — verified, high confidence, location-independent.**
+  Sony's official-branded retail chain runs on Shopify, which exposes a
+  public `/products/<handle>.js` endpoint with a clean `available: true/false`
   boolean per product. This is an `"api"` strategy target: no DOM scraping,
-  no bot-detection exposure, no fragile UI flow. Sony doesn't sell PS5
-  hardware through its own sony.co.in store in India — this is the closest
-  thing to an official first-party channel. Covers both the Standard and
-  Digital Edition console SKUs.
-- **Amazon.in — verified selector, national only, medium confidence.**
+  no bot-detection exposure, no fragile UI flow, and it's a genuine national
+  online sale — no per-pincode ambiguity. If this shows in stock, you can
+  actually buy it. Sony doesn't sell PS5 hardware through its own sony.co.in
+  store in India — this is the closest thing to an official first-party
+  channel. Covers both the Standard and Digital Edition console SKUs.
+- **Amazon.in — verified selector, medium confidence, location-dependent.**
   `#availability` reliably shows "Currently unavailable." when out of stock.
-  Amazon's location-change modal exists (`#nav-global-location-popover-link`
-  → `#GLUXZipUpdateInput` → `#GLUXZipUpdate`) but would not actually apply a
-  new pincode under headless Playwright in testing — Amazon's bot detection
-  appears to specifically obstruct that interactive flow. So this checks
-  whichever location Amazon auto-detects from the machine's IP, not a chosen
-  city.
+- **Flipkart — verified via structured data, high confidence for "in stock
+  somewhere," location-dependent for "deliverable to you."** Every product
+  page embeds a `<script type="application/ld+json" id="jsonLD">` block
+  (schema.org markup, kept stable for Google Shopping/SEO) with
+  `offers.availability` — far more reliable than Flipkart's own
+  auto-generated/rotating CSS classes, which have no stable selector at all.
 - **Excluded after live testing, not shipped:** Croma (blocked outright,
-  HTTP 403 on a plain page load), Flipkart (auto-generated/rotating CSS
-  class names, no stable selector), Vijay Sales (a real OOS/in-stock signal
+  HTTP 403 on a plain page load), Vijay Sales (a real OOS/in-stock signal
   exists, but the page interleaves this product with an unrelated "related
   products" carousel using the same classes — `.first()` picked up the wrong
   card in testing), Reliance Digital (pincode input exists but no reachable
   "Apply" button was found, and the real stock element rendered as an empty
   Vue.js placeholder on initial load).
 
-None of these mainstream retailers expose per-city stock — they all sell
-from one national inventory pool; a pincode only affects delivery estimate,
-not whether the item is purchasable at all. That's why there's no
-per-city breakdown for Cuttack/Bhubaneswar/Patiala/Chandigarh/Dehradun/
-Delhi/Gurugram/Hyderabad/Lucknow/Bangalore/Mumbai/Pune here — "is it in
-stock anywhere nationally" is the only signal that actually exists to check.
+**⚠️ Important: Amazon and Flipkart's "in stock" is not "in stock near you."**
+Neither exposes a scriptable way to check a chosen city/pincode — both
+default to whatever location their server resolves from the request's IP,
+and their real delivery-location pickers do not respond to headless
+automation at all (confirmed live: typing a pincode triggers no suggestions
+and no network call on either site, and neither has a location cookie that
+could be set directly as a shortcut). This was found the hard way — a real
+alert fired for Flipkart showing "InStock" while the page separately showed
+no seller servicing the actual pincode being checked from.
+
+**What this means practically:**
+- **Run this script from your own home connection**, in the city you
+  actually care about — since these sites default to IP-resolved location,
+  running from home genuinely reflects your area, without needing to
+  automate any picker at all.
+- **Do not rely on the included GitHub Actions workflow**
+  (`.github/workflows/stock-check.yml`) **for Amazon/Flipkart accuracy** —
+  GitHub's hosted runners execute from their own cloud datacenters (not
+  India), so the resolved location would be arbitrary, not yours. Sony
+  Center is unaffected by this (national sale, not location-gated) and is
+  fine to run from GitHub Actions or anywhere else.
+- Treat an Amazon/Flipkart "in stock" alert as "worth checking right now,"
+  not a guarantee it'll be deliverable to you.
+
+None of these mainstream retailers expose true per-city stock the way
+quick-commerce apps do — Amazon/Flipkart/Sony Center sell from one national
+inventory pool, where a pincode only affects delivery estimate/servicing,
+not whether the item exists at all. That's why there's no per-city target
+breakdown for Cuttack/Bhubaneswar/Patiala/Chandigarh/Dehradun/Delhi/
+Gurugram/Hyderabad/Lucknow/Bangalore/Mumbai/Pune here for these retailers —
+running the script from your own city's connection is what actually answers
+"is it available near me," not a scripted pincode picker.
 
 The excluded retailers aren't unfixable — `cookies`/`preActions`/`press`
 exist specifically to support flows like theirs. Picking it up yourself
@@ -140,23 +166,37 @@ page, for two structural reasons:
    real availability. That's what `preActions`/`cookies` above are for.
 2. **Bot detection varies a lot by platform, and changes without notice.**
    Roughly, from more to less scrapable with a plain headless browser:
+   - **Blinkit — CONFIRMED WORKING, verified live 2026-07-08.** Its web
+     "Change Location" modal genuinely responds to headless Playwright:
+     typing a pincode returns real suggestions, and clicking one updates the
+     delivery address and re-renders availability for that pincode — no app,
+     device token, or session cookie needed. The selectors in `targets.ts`
+     (`blinkit-ps5-110001`) are real, not placeholders. One gotcha found
+     live: the product page also renders "Top 10 products in this category"
+     / "People also bought" carousels full of *other* products' "ADD"
+     buttons, so the stock selector must be scoped to the product's own
+     info panel (`ProductWrapperRightSection`) or it'll false-positive on
+     an unrelated carousel item — the same trap that excluded Vijay Sales
+     above.
    - **BigBasket, Flipkart Minutes** — standard e-commerce web flow, so a
      `dom` strategy with `preActions` for the pincode picker generally
-     works. Flipkart in particular runs aggressive bot detection (Akamai);
-     expect occasional CAPTCHAs/blocks and keep intervals conservative.
-   - **Blinkit, Swiggy Instamart, Zepto** — built app-first. Their web
-     versions exist but availability/location logic often leans on
-     internal APIs with device/session tokens that a plain browser context
-     doesn't have, so `preActions` may not fully replicate what the app
-     does. Treat the example targets in `targets.ts` for these three as a
-     starting point to adapt, not as working code.
+     works, going by general site behavior — not verified with the same
+     live rigor as Blinkit yet. Flipkart in particular runs aggressive bot
+     detection (Akamai); expect occasional CAPTCHAs/blocks and keep
+     intervals conservative.
+   - **Swiggy Instamart, Zepto** — built app-first. Their web versions exist
+     but availability/location logic often leans on internal APIs with
+     device/session tokens that a plain browser context doesn't have, so
+     `preActions` may not fully replicate what the app does. Treat the
+     example targets in `targets.ts` for these two as a starting point to
+     adapt, not as working code.
 
 Practical recommendations:
 
-- Open each real target in an actual browser first, use DevTools to find
-  the true location-picker selectors and the stock-badge selector/text for
-  your pincode, and replace the placeholders — they will not match live
-  markup as shipped.
+- Open each remaining placeholder target in an actual browser first, use
+  DevTools to find the true location-picker selectors and the stock-badge
+  selector/text for your pincode, and replace the placeholders — they will
+  not match live markup as shipped.
 - Give these targets a longer `CHECK_INTERVAL_MINUTES` and don't lower
   `MIN/MAX_DELAY_BETWEEN_TARGETS_MS` — the extra `preActions` round-trip per
   check already makes each one slower and more bot-like than a static page
