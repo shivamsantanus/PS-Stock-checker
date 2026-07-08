@@ -10,9 +10,23 @@ const COMMON_HEADERS = {
   "Upgrade-Insecure-Requests": "1",
 };
 
-function matchesInStock(text: string, inStockValues: string[]): boolean {
+function containsAny(text: string, values: string[]): boolean {
   const normalized = text.toLowerCase();
-  return inStockValues.some((v) => normalized.includes(v.toLowerCase()));
+  return values.some((v) => normalized.includes(v.toLowerCase()));
+}
+
+/**
+ * outOfStockValues (if given) are checked first, since an explicit OOS
+ * marker ("Out Of Stock", "Notify Me") is usually a more reliable signal on
+ * a busy page than the mere presence of "add to cart" text, which can come
+ * from an unrelated recommendation carousel. Falls back to OUT_OF_STOCK if
+ * neither list matches - an inconclusive read should never look "in stock".
+ */
+function resolveStatus(text: string, target: Target): StockStatus {
+  if (target.outOfStockValues && containsAny(text, target.outOfStockValues)) {
+    return "OUT_OF_STOCK";
+  }
+  return containsAny(text, target.inStockValues) ? "IN_STOCK" : "OUT_OF_STOCK";
 }
 
 /** Resolves a dot-path like "a.b.c" against a parsed JSON object. */
@@ -83,6 +97,8 @@ export class StockChecker {
       for (const step of target.preActions ?? []) {
         if (step.action === "fill") {
           await page.fill(step.selector, step.value ?? "");
+        } else if (step.action === "press") {
+          await page.press(step.selector, step.value ?? "Enter");
         } else {
           await page.click(step.selector);
         }
@@ -93,15 +109,24 @@ export class StockChecker {
 
       // Wait specifically for the availability element rather than a fixed
       // sleep - this is both faster on average and more resilient to
-      // variable page load times.
-      await page.waitForSelector(target.selector, { timeout: config.requestTimeoutMs });
+      // variable page load times. state: "attached" (not the default
+      // "visible") because some selectors deliberately target non-rendered
+      // elements like <script type="application/ld+json">.
+      await page.waitForSelector(target.selector, { timeout: config.requestTimeoutMs, state: "attached" });
 
-      const rawText = (await page.locator(target.selector).first().innerText()).trim();
-      const status: StockStatus = matchesInStock(rawText, target.inStockValues)
-        ? "IN_STOCK"
-        : "OUT_OF_STOCK";
-
-      return { status, detail: rawText };
+      // innerText first: for normal visible elements it correctly excludes
+      // nested non-rendered nodes (e.g. an inline <script> that happens to
+      // be a descendant), which textContent would otherwise pull in as
+      // noise. Only fall back to textContent when innerText is empty - that
+      // happens for selectors that are themselves non-rendered, like a
+      // <script type="application/ld+json"> block used to read structured
+      // data (a more stable signal than visual, freely-changing markup).
+      const locator = page.locator(target.selector).first();
+      let rawText = (await locator.innerText().catch(() => "")).trim();
+      if (!rawText) {
+        rawText = ((await locator.textContent()) ?? "").trim();
+      }
+      return { status: resolveStatus(rawText, target), detail: rawText };
     } finally {
       await context?.close();
     }
@@ -124,10 +149,6 @@ export class StockChecker {
     }
 
     const rawText = String(value);
-    const status: StockStatus = matchesInStock(rawText, target.inStockValues)
-      ? "IN_STOCK"
-      : "OUT_OF_STOCK";
-
-    return { status, detail: rawText };
+    return { status: resolveStatus(rawText, target), detail: rawText };
   }
 }

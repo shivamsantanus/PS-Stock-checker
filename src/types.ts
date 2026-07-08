@@ -8,9 +8,9 @@ export type CheckStrategy = "dom" | "api";
  * until a delivery pincode/address is set via an on-page picker.
  */
 export interface PreAction {
-  action: "fill" | "click";
+  action: "fill" | "click" | "press";
   selector: string;
-  value?: string; // required for "fill"
+  value?: string; // required for "fill" and "press" (e.g. "Enter")
   waitAfterMs?: number; // pause after the action, e.g. to let a dropdown/suggestion list settle
 }
 
@@ -36,6 +36,15 @@ export interface Target {
   jsonPath?: string;
   // Values (case-insensitive substring match) that count as "in stock" for this target.
   inStockValues: string[];
+  // Optional: values that count as "out of stock", checked BEFORE inStockValues.
+  // Use this when the page reliably renders an explicit OOS marker (e.g. "Out Of
+  // Stock", "Notify Me") but the "in stock" state is just the absence of that
+  // marker rather than a distinct, reliably-present element - broad selectors
+  // like "body" combined with a narrow, specific outOfStockValues signal are
+  // less prone to waitForSelector timeouts and false positives from unrelated
+  // "add to cart" text elsewhere on the page (recommendation carousels, etc).
+  // If neither list matches, the target is reported OUT_OF_STOCK (safe default).
+  outOfStockValues?: string[];
   // dom strategy only, optional: cookies set on the browser context before navigating -
   // use for sites that read delivery location/pincode from a cookie.
   cookies?: CookieSeed[];

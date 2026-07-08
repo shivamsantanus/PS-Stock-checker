@@ -31,6 +31,10 @@ export const config = {
   checkIntervalMinutes: optionalInt("CHECK_INTERVAL_MINUTES", 10),
   jitterSeconds: optionalInt("JITTER_SECONDS", 30),
 
+  // When true, run a single check cycle and exit instead of looping forever.
+  // Used when the scheduling itself is external (e.g. a GitHub Actions cron).
+  runOnce: optionalBool("RUN_ONCE", false),
+
   headless: optionalBool("HEADLESS", true),
   requestTimeoutMs: optionalInt("REQUEST_TIMEOUT_MS", 30_000),
 

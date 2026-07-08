@@ -69,19 +69,65 @@ Edit `src/targets.ts`. Each entry is either:
 
 `inStockValues` is a list of case-insensitive substrings; if the scraped
 text/value contains any of them, the target is considered `IN_STOCK`.
+`outOfStockValues` (optional) is checked first — use it when a site reliably
+renders an explicit "Out Of Stock"/"Notify Me" marker, since that's often a
+more trustworthy signal than the mere presence of "Add to Cart" text
+elsewhere on a busy page (recommendation carousels, etc). If neither list
+matches, the target is reported `OUT_OF_STOCK` — an inconclusive read should
+never look like "in stock."
 
-Two extra `dom`-strategy fields exist for sites that gate availability
-behind a delivery location (see "Quick-commerce platforms" below):
+Extra `dom`-strategy fields exist for sites that gate availability behind a
+delivery location (see "Quick-commerce platforms" below):
 
 - **`cookies`** — set directly on the browser context before navigating, for
   sites that read delivery pincode/address from a cookie.
-- **`preActions`** — a list of `{ action: "fill" | "click", selector, value?,
-  waitAfterMs? }` steps run after page load and before reading `selector`,
-  to drive an on-page location picker (type a pincode, click a suggestion).
+- **`preActions`** — a list of `{ action: "fill" | "click" | "press",
+  selector, value?, waitAfterMs? }` steps run after page load and before
+  reading `selector`, to drive an on-page location picker (type a pincode,
+  click a suggestion, or press Enter to submit).
 
-The selectors/endpoints shipped in `targets.ts` are placeholders — every
-retailer's site is different and changes over time. Inspect your actual
-target site and fill in real values before running this live.
+## Retailer confidence (PS5 console, India)
+
+`targets.ts` ships with three tiers of confidence, based on live testing
+done while building this — not guesses:
+
+- **Sony Center (shopatsc.com) — verified, high confidence.** Sony's
+  official-branded retail chain runs on Shopify, which exposes a public
+  `/products/<handle>.js` endpoint with a clean `available: true/false`
+  boolean per product. This is an `"api"` strategy target: no DOM scraping,
+  no bot-detection exposure, no fragile UI flow. Sony doesn't sell PS5
+  hardware through its own sony.co.in store in India — this is the closest
+  thing to an official first-party channel. Covers both the Standard and
+  Digital Edition console SKUs.
+- **Amazon.in — verified selector, national only, medium confidence.**
+  `#availability` reliably shows "Currently unavailable." when out of stock.
+  Amazon's location-change modal exists (`#nav-global-location-popover-link`
+  → `#GLUXZipUpdateInput` → `#GLUXZipUpdate`) but would not actually apply a
+  new pincode under headless Playwright in testing — Amazon's bot detection
+  appears to specifically obstruct that interactive flow. So this checks
+  whichever location Amazon auto-detects from the machine's IP, not a chosen
+  city.
+- **Excluded after live testing, not shipped:** Croma (blocked outright,
+  HTTP 403 on a plain page load), Flipkart (auto-generated/rotating CSS
+  class names, no stable selector), Vijay Sales (a real OOS/in-stock signal
+  exists, but the page interleaves this product with an unrelated "related
+  products" carousel using the same classes — `.first()` picked up the wrong
+  card in testing), Reliance Digital (pincode input exists but no reachable
+  "Apply" button was found, and the real stock element rendered as an empty
+  Vue.js placeholder on initial load).
+
+None of these mainstream retailers expose per-city stock — they all sell
+from one national inventory pool; a pincode only affects delivery estimate,
+not whether the item is purchasable at all. That's why there's no
+per-city breakdown for Cuttack/Bhubaneswar/Patiala/Chandigarh/Dehradun/
+Delhi/Gurugram/Hyderabad/Lucknow/Bangalore/Mumbai/Pune here — "is it in
+stock anywhere nationally" is the only signal that actually exists to check.
+
+The excluded retailers aren't unfixable — `cookies`/`preActions`/`press`
+exist specifically to support flows like theirs. Picking it up yourself
+means running with `HEADLESS=false` and walking through the real flow in
+DevTools; the notes above give you the exact selectors/endpoints already
+found so you're not starting from zero.
 
 ## Quick-commerce platforms (BigBasket, Flipkart Minutes, Blinkit, Instamart, Zepto, ...)
 
@@ -133,6 +179,38 @@ npm run build && npm start   # compiled JS
 only fires on an `OUT_OF_STOCK`/`UNKNOWN` -> `IN_STOCK` transition. Repeated
 checks while a target stays in stock (or stays out of stock) produce no
 notification, only a log line.
+
+## Running 24/7 on GitHub Actions
+
+`.github/workflows/stock-check.yml` runs one check cycle on a cron schedule
+(roughly every 10 minutes) instead of you hosting a long-running process
+yourself. To use it:
+
+1. **Push this repo to GitHub as a public repo.** Actions minutes are free
+   and unlimited for public repos; private repos are capped at 2,000
+   free minutes/month, which a 10-minute schedule will exceed. Making it
+   public exposes your code/target list, not your secrets.
+2. In the repo's **Settings -> Secrets and variables -> Actions**, add
+   whichever of `DISCORD_WEBHOOK_URL`, `TELEGRAM_BOT_TOKEN`,
+   `TELEGRAM_CHAT_ID` you use - same values as your local `.env`.
+3. The workflow builds the project, restores `data/state.json` from the
+   previous run via `actions/cache`, runs one cycle with `RUN_ONCE=true`,
+   then saves the updated state back to the cache so the next run doesn't
+   re-alert.
+4. Trigger it manually from the Actions tab (`workflow_dispatch`) to test
+   before waiting on the schedule.
+
+Caveats vs. hosting it yourself on a VPS:
+
+- GitHub does **not guarantee scheduled workflows run on time** - during
+  high load they can be delayed by many minutes, sometimes over an hour.
+  Fine for casual monitoring, not for racing other bots to a restock.
+- Scheduled workflows are **automatically disabled after 60 days** of no
+  repository activity (commits/pushes) - push something occasionally, or
+  re-enable it manually from the Actions tab.
+- GitHub-hosted runner IPs are recognizable datacenter ranges, which can
+  make bot detection on sites like Amazon more likely to trigger than from
+  a residential/VPS IP.
 
 ## How it avoids looking like a bot
 

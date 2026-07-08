@@ -98,9 +98,18 @@ async function main(): Promise<void> {
 
     if (shuttingDown) break;
 
+    if (config.runOnce) {
+      logger.info("RUN_ONCE is set, exiting after a single cycle");
+      break;
+    }
+
     const waitMs = nextIntervalMs();
     logger.info(`Sleeping for ${Math.round(waitMs / 1000)}s until next cycle`);
     await sleep(waitMs);
+  }
+
+  if (!shuttingDown) {
+    await checker.close();
   }
 }
 
