@@ -171,7 +171,7 @@ page, for two structural reasons:
      typing a pincode returns real suggestions, and clicking one updates the
      delivery address and re-renders availability for that pincode — no app,
      device token, or session cookie needed. The selectors in `targets.ts`
-     (`blinkit-ps5-110001`) are real, not placeholders. One gotcha found
+     (e.g. `blinkit-ps5-147002`) are real, not placeholders. One gotcha found
      live: the product page also renders "Top 10 products in this category"
      / "People also bought" carousels full of *other* products' "ADD"
      buttons, so the stock selector must be scoped to the product's own

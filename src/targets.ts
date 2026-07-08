@@ -121,14 +121,15 @@ export const TARGETS: Target[] = [
   // Unlike the mainstream retailers above, these DO gate real-time stock
   // behind a delivery pincode/address (they run dark-store fulfillment, not
   // one national inventory pool) - so per-city checks are meaningful here,
-  // via `preActions` driving each site's location picker. Blinkit is now
-  // CONFIRMED WORKING (see its own comment below) - the other four
-  // (BigBasket, Flipkart Minutes, Instamart, Zepto) were NOT live-verified
-  // with the same rigor - every id/selector/pincode for those is still a
-  // PLACEHOLDER. Open the real site in a browser, inspect the location
-  // picker and stock badge with DevTools, and replace these before running
-  // against a live site. See README.md -> "Quick-commerce platforms" for
-  // per-platform feasibility notes.
+  // via `preActions` driving each site's location picker. Blinkit and Zepto
+  // are now CONFIRMED WORKING (see their own comments below) - Instamart's
+  // location picker was live-tested and found NOT to work headless (see its
+  // comment below for the finding), and BigBasket/Flipkart Minutes were not
+  // live-verified with the same rigor - every id/selector/pincode for those
+  // two is still a PLACEHOLDER. Open the real site in a browser, inspect the
+  // location picker and stock badge with DevTools, and replace these before
+  // running against a live site. See README.md -> "Quick-commerce platforms"
+  // for per-platform feasibility notes.
 
   {
     id: "bigbasket-ps5-411001",
@@ -156,57 +157,120 @@ export const TARGETS: Target[] = [
     selector: "._16FRp0", // Flipkart's class names are obfuscated/rotate often - re-verify frequently
     inStockValues: ["add to cart"],
   },
-  {
-    // VERIFIED live 2026-07-08 against the real product page below - unlike
-    // Amazon/Flipkart, Blinkit's location picker DOES respond to headless
-    // automation: typing a pincode into the "Change Location" modal returns
-    // real suggestions, and clicking one actually updates the delivery
-    // address and re-renders availability for that pincode.
-    id: "blinkit-ps5-110001",
-    label: "Blinkit - Delhi 110001",
-    url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
-    strategy: "dom",
-    preActions: [
-      // Opens the "Change Location" modal from the header.
-      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-      { action: "fill", selector: "input[name='select-locality']", value: "110001", waitAfterMs: 2000 },
-      // Clicks the first suggestion in the results list.
-      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-    ],
-    // Scoped to the product's own info panel (breadcrumb/title/price/stock),
-    // NOT the whole page - this product page also renders "Top 10 products
-    // in this category" and "People also bought" carousels full of OTHER
-    // products' "ADD" buttons, so a page-wide selector would false-positive
-    // on those. `ProductWrapperRightSection` is a styled-components class
-    // that wraps only the real product's info column.
-    selector: "div[class*='ProductWrapperRightSection']",
-    outOfStockValues: ["out of stock"],
-    inStockValues: ["add"],
-  },
-  {
-    id: "instamart-ps5-500001",
-    label: "Swiggy Instamart - Hyderabad 500001",
-    url: "https://www.swiggy.com/instamart/item/000000",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "[data-testid='address-selector']" },
-      { action: "fill", selector: "input[placeholder='Search for area, street name...']", value: "500001", waitAfterMs: 1200 },
-      { action: "click", selector: "[data-testid='address-search-result-0']", waitAfterMs: 1500 },
-    ],
-    selector: "[data-testid='add-to-cart-button']",
-    inStockValues: ["add"],
-  },
-  {
-    id: "zepto-ps5-400001",
-    label: "Zepto - Mumbai 400001",
-    url: "https://www.zeptonow.com/pn/example-product/pvid/00000000-0000-0000-0000-000000000000",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "[data-testid='address-bar']" },
-      { action: "fill", selector: "input[placeholder='Search a new address']", value: "400001", waitAfterMs: 1200 },
-      { action: "click", selector: "[data-testid='address-search-result-0']", waitAfterMs: 1500 },
-    ],
-    selector: "[data-testid='product-card-add-button']",
-    inStockValues: ["add"],
-  },
+  // --- Priority pincodes, requested 2026-07-08 - checked on Blinkit, Zepto,
+  // and Instamart, in this priority order: Patiala (147002, 147001), Cuttack
+  // (753004, 753006), Gurugram (122098), Bhubaneswar (751012, 751006). ------
+  // Added the same day: Dehradun (248001), Lucknow (226016), Bangalore
+  // (560075) - live-verified end-to-end on Blinkit and Zepto (same selectors
+  // as their first live-tested entries below, using the real PS5 product
+  // page and pincode picker for each site).
+  //
+  // Instamart real product wired in 2026-07-08 (PS5 1TB Slim console,
+  // https://www.swiggy.com/stores/instamart/item/MXX8JAYWGR) - live-tested
+  // against this exact URL, but the per-pincode preActions are CONFIRMED
+  // NOT to work (no location picker exists on this page, and the homepage
+  // flow that has one is bot-blocked headless) - see the comment on the
+  // instamart-ps5-* entry below for the full finding.
+
+  ...(
+    [
+      { pincode: "147002", city: "Patiala" },
+      { pincode: "753004", city: "Cuttack" },
+      { pincode: "753006", city: "Cuttack" },
+      { pincode: "147001", city: "Patiala" },
+      { pincode: "122098", city: "Gurugram" },
+      { pincode: "751012", city: "Bhubaneswar" },
+      { pincode: "751006", city: "Bhubaneswar" },
+      { pincode: "248001", city: "Dehradun" },
+      { pincode: "226016", city: "Lucknow" },
+      { pincode: "560075", city: "Bangalore" },
+    ] as { pincode: string; city: string }[]
+  ).flatMap(({ pincode, city }): Target[] => [
+    {
+      // Blinkit's location picker is VERIFIED WORKING (see original
+      // 2026-07-08 live test on pincode 110001) - typing a pincode into the
+      // "Change Location" modal returns real suggestions, and clicking one
+      // actually updates the delivery address and re-renders availability.
+      id: `blinkit-ps5-${pincode}`,
+      label: `Blinkit - ${city} ${pincode}`,
+      url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
+      strategy: "dom",
+      preActions: [
+        // Opens the "Change Location" modal from the header.
+        { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+        { action: "fill", selector: "input[name='select-locality']", value: pincode, waitAfterMs: 2000 },
+        // Clicks the first suggestion in the results list.
+        { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+      ],
+      // Scoped to the product's own info panel (breadcrumb/title/price/stock),
+      // NOT the whole page - this product page also renders "Top 10 products
+      // in this category" and "People also bought" carousels full of OTHER
+      // products' "ADD" buttons, so a page-wide selector would false-positive
+      // on those. `ProductWrapperRightSection` is a styled-components class
+      // that wraps only the real product's info column.
+      selector: "div[class*='ProductWrapperRightSection']",
+      outOfStockValues: ["out of stock"],
+      inStockValues: ["add"],
+    },
+    {
+      // PLACEHOLDER preActions - CONFIRMED NOT TO WORK, live-tested
+      // 2026-07-08 against this exact product URL. Findings:
+      //   - The real product page has NO location/pincode picker element at
+      //     all - dumped every data-testid on the page (30 of them) and the
+      //     full header HTML; nothing resembling `address-selector` exists.
+      //     Stock appears to resolve server-side (IP-based), the same
+      //     caveat that applies to Amazon/Flipkart above.
+      //   - Swiggy's Instamart homepage (the only place with a real address
+      //     search flow) is bot-blocked outright in headless mode:
+      //     "Request Blocked - Your request looks automated".
+      // Net effect: every entry below will click/fill against selectors that
+      // don't exist, silently no-op, and all 10 will report the SAME
+      // (server-inferred) status regardless of pincode - this does NOT
+      // actually check per-city availability yet. `selector` below IS
+      // confirmed real (data-testid="sold-out" is genuinely present on the
+      // page today), so the OUT_OF_STOCK reading itself is trustworthy -
+      // just not the per-pincode part.
+      id: `instamart-ps5-${pincode}`,
+      label: `Swiggy Instamart - ${city} ${pincode} (location NOT verified - see comment)`,
+      url: "https://www.swiggy.com/stores/instamart/item/MXX8JAYWGR",
+      strategy: "dom",
+      preActions: [
+        { action: "click", selector: "[data-testid='address-selector']" },
+        { action: "fill", selector: "input[placeholder='Search for area, street name...']", value: pincode, waitAfterMs: 1200 },
+        { action: "click", selector: "[data-testid='address-search-result-0']", waitAfterMs: 1500 },
+      ],
+      selector: "[data-testid='sold-out']",
+      outOfStockValues: ["sold out"],
+      inStockValues: ["add"],
+    },
+    {
+      // VERIFIED live 2026-07-08 against the real product page below.
+      // Zepto's location picker DOES respond to headless automation, same
+      // as Blinkit's: opening the address modal via `user-address`, filling
+      // the search box, and clicking the first `address-search-item` result
+      // actually updates delivery location and re-renders availability -
+      // confirmed live by pincode 147002 flipping the CTA from
+      // "Add to Cart" to "Notify Me when back in stock".
+      id: `zepto-ps5-${pincode}`,
+      label: `Zepto - ${city} ${pincode}`,
+      url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
+      strategy: "dom",
+      preActions: [
+        // Opens the "Select Location" modal from the header.
+        { action: "click", selector: "[data-testid='user-address']" },
+        { action: "fill", selector: "[data-testid='address-search-input'] input", value: pincode, waitAfterMs: 2000 },
+        // Clicks the first suggestion in the results list.
+        { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 3500 },
+      ],
+      // Scoped to the buy-box only (title/price/CTA) - confirmed NOT to
+      // include the page's global nav/footer, which also lists city names
+      // like "Patiala" and "Gurugram" that would otherwise false-positive
+      // on naive text matching. Like Flipkart's obfuscated classes, this is
+      // a hashed CSS-module class name that may rotate on Zepto redeploys -
+      // re-verify if this target starts erroring out.
+      selector: ".KQfnF.ckhcV",
+      outOfStockValues: ["notify me", "out of stock"],
+      inStockValues: ["add to cart"],
+    },
+  ]),
 ];
