@@ -184,6 +184,14 @@ export const TARGETS: Target[] = [
       { pincode: "248001", city: "Dehradun" },
       { pincode: "226016", city: "Lucknow" },
       { pincode: "560075", city: "Bangalore" },
+      // Added 2026-07-08 - same flatMap, so these get the same
+      // Blinkit/Instamart/Zepto entries as the priority pincodes above.
+      { pincode: "177211", city: "Amb" },
+      { pincode: "121010", city: "Faridabad" },
+      { pincode: "121001", city: "Faridabad" },
+      { pincode: "121003", city: "Faridabad" },
+      { pincode: "560072", city: "Bangalore" },
+      { pincode: "221010", city: "Varanasi" },
     ] as { pincode: string; city: string }[]
   ).flatMap(({ pincode, city }): Target[] => [
     {
