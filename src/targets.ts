@@ -192,6 +192,32 @@ export const TARGETS: Target[] = [
       { pincode: "121003", city: "Faridabad" },
       { pincode: "560072", city: "Bangalore" },
       { pincode: "221010", city: "Varanasi" },
+      // Added 2026-07-10 - Bangalore pincode sweep requested by the user.
+      // (560072 already existed above - not duplicated here.)
+      { pincode: "560062", city: "Bangalore" },
+      { pincode: "560043", city: "Bangalore" },
+      { pincode: "560066", city: "Bangalore" },
+      { pincode: "560064", city: "Bangalore" },
+      { pincode: "560076", city: "Bangalore" },
+      { pincode: "560069", city: "Bangalore" },
+      { pincode: "560078", city: "Bangalore" },
+      { pincode: "560103", city: "Bangalore" },
+      { pincode: "560094", city: "Bangalore" },
+      { pincode: "560037", city: "Bangalore" },
+      { pincode: "560045", city: "Bangalore" },
+      { pincode: "560102", city: "Bangalore" },
+      { pincode: "560057", city: "Bangalore" },
+      { pincode: "560008", city: "Bangalore" },
+      { pincode: "560010", city: "Bangalore" },
+      { pincode: "560032", city: "Bangalore" },
+      { pincode: "560041", city: "Bangalore" },
+      { pincode: "560024", city: "Bangalore" },
+      { pincode: "560029", city: "Bangalore" },
+      { pincode: "560073", city: "Bangalore" },
+      { pincode: "560048", city: "Bangalore" },
+      { pincode: "560067", city: "Bangalore" },
+      { pincode: "560100", city: "Bangalore" },
+      { pincode: "560114", city: "Bangalore" },
     ] as { pincode: string; city: string }[]
   ).flatMap(({ pincode, city }): Target[] => [
     {
