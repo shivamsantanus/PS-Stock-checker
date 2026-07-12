@@ -218,6 +218,8 @@ export const TARGETS: Target[] = [
       { pincode: "560067", city: "Bangalore" },
       { pincode: "560100", city: "Bangalore" },
       { pincode: "560114", city: "Bangalore" },
+      // Added 2026-07-12 - Gagal Home, Sector 6, Ghansoli, Navi Mumbai.
+      { pincode: "400701", city: "Ghansoli, Navi Mumbai" },
     ] as { pincode: string; city: string }[]
   ).flatMap(({ pincode, city }): Target[] => [
     {
@@ -339,4 +341,148 @@ export const TARGETS: Target[] = [
       inStockValues: ["add to cart"],
     },
   ]),
+
+  // --- User-specific address, added 2026-07-10: A Block 313, DS Max Sangam
+  // Grand, Seeghehalli, Kadugodi, Whitefield, Bengaluru 560067. -------------
+  //
+  // NOT part of the pincode flatMap above on purpose: live-testing this
+  // pincode found that a bare "560067"/"560066" search on Zepto/Blinkit
+  // returns multiple distinct locality suggestions (Whitefield, Kadugodi,
+  // Whitefield - Hoskote Road, ...) that resolve to DIFFERENT dark stores
+  // with different stock - the flatMap's blind "click the first suggestion"
+  // approach can land on a different store than this specific address uses.
+  // Confirmed live 2026-07-10 that searching "Kadugodi Whitefield 560067"
+  // and clicking the first result resolves to address label "Kadugodi -
+  // Kadugodi, Bangalore, Karnataka", matching this address's real locality -
+  // both editions read OUT_OF_STOCK on Zepto and Blinkit at verification
+  // time.
+  {
+    id: "zepto-ps5-kadugodi-560067",
+    label: "Zepto - Kadugodi, Whitefield, Bangalore 560067",
+    url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "[data-testid='user-address']" },
+      {
+        action: "fill",
+        selector: "[data-testid='address-search-input'] input",
+        value: "Kadugodi Whitefield 560067",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
+    ],
+    selector: ".KQfnF.ckhcV",
+    outOfStockValues: ["notify me", "out of stock"],
+    inStockValues: ["add to cart"],
+  },
+  {
+    id: "zepto-ps5-digital-kadugodi-560067",
+    label: "Zepto - Kadugodi, Whitefield, Bangalore 560067 (Digital Edition)",
+    url: "https://www.zepto.com/pn/playstation-5-console-digital/pvid/4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "[data-testid='user-address']" },
+      {
+        action: "fill",
+        selector: "[data-testid='address-search-input'] input",
+        value: "Kadugodi Whitefield 560067",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
+    ],
+    selector: ".KQfnF.ckhcV",
+    outOfStockValues: ["notify me", "out of stock"],
+    inStockValues: ["add to cart"],
+  },
+  {
+    id: "blinkit-ps5-kadugodi-560067",
+    label: "Blinkit - Kadugodi, Whitefield, Bangalore 560067",
+    url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+      {
+        action: "fill",
+        selector: "input[name='select-locality']",
+        value: "Kadugodi Whitefield 560067",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+    ],
+    selector: "div[class*='ProductWrapperRightSection']",
+    outOfStockValues: ["out of stock"],
+    inStockValues: ["add"],
+  },
+
+  // --- User-specific address, added 2026-07-10: P6, Jeevan Bheema Nagar,
+  // LIC Colony, near Dr. Chaitanya Dental Clinic, Bengaluru 560075. ---------
+  //
+  // Unlike the Kadugodi/560067 case above, this one was checked and found
+  // NOT ambiguous: searching the bare pincode "560075" and searching the
+  // specific locality "Jeevan Bheema Nagar LIC Colony 560075" both resolve
+  // to the SAME dark-store zone label ("New Tippasandara") on Zepto, and
+  // both read identically OUT_OF_STOCK on Zepto and Blinkit at verification
+  // time - so the existing bare-pincode targets (`zepto-ps5-560075`,
+  // `blinkit-ps5-560075`, etc., from the flatMap above) already cover this
+  // address correctly. Added as its own explicit target anyway, purely so
+  // this specific address has its own tracked id/label in state.json rather
+  // than being implicitly bundled under the generic "Bangalore 560075"
+  // label - not because it revealed a different store.
+  {
+    id: "zepto-ps5-jeevanbhimanagar-560075",
+    label: "Zepto - Jeevan Bhima Nagar, LIC Colony, Bangalore 560075",
+    url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "[data-testid='user-address']" },
+      {
+        action: "fill",
+        selector: "[data-testid='address-search-input'] input",
+        value: "Jeevan Bheema Nagar LIC Colony 560075",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
+    ],
+    selector: ".KQfnF.ckhcV",
+    outOfStockValues: ["notify me", "out of stock"],
+    inStockValues: ["add to cart"],
+  },
+  {
+    id: "zepto-ps5-digital-jeevanbhimanagar-560075",
+    label: "Zepto - Jeevan Bhima Nagar, LIC Colony, Bangalore 560075 (Digital Edition)",
+    url: "https://www.zepto.com/pn/playstation-5-console-digital/pvid/4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "[data-testid='user-address']" },
+      {
+        action: "fill",
+        selector: "[data-testid='address-search-input'] input",
+        value: "Jeevan Bheema Nagar LIC Colony 560075",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
+    ],
+    selector: ".KQfnF.ckhcV",
+    outOfStockValues: ["notify me", "out of stock"],
+    inStockValues: ["add to cart"],
+  },
+  {
+    id: "blinkit-ps5-jeevanbhimanagar-560075",
+    label: "Blinkit - Jeevan Bhima Nagar, LIC Colony, Bangalore 560075",
+    url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+      {
+        action: "fill",
+        selector: "input[name='select-locality']",
+        value: "Jeevan Bheema Nagar LIC Colony 560075",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+    ],
+    selector: "div[class*='ProductWrapperRightSection']",
+    outOfStockValues: ["out of stock"],
+    inStockValues: ["add"],
+  },
 ];
