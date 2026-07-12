@@ -1,4 +1,4 @@
-export type StockStatus = "IN_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
+export type StockStatus = "IN_STOCK" | "COMING_SOON" | "OUT_OF_STOCK" | "UNKNOWN";
 
 export type CheckStrategy = "dom" | "api";
 
@@ -45,6 +45,11 @@ export interface Target {
   // "add to cart" text elsewhere on the page (recommendation carousels, etc).
   // If neither list matches, the target is reported OUT_OF_STOCK (safe default).
   outOfStockValues?: string[];
+  // Optional: values that mean "listed but not yet orderable" (e.g. Blinkit's
+  // "Coming soon" badge on pre-launch SKUs) - checked BEFORE outOfStockValues
+  // and inStockValues, since it's a more specific signal than plain OOS and
+  // worth its own notification so you know to go check the app by hand.
+  comingSoonValues?: string[];
   // dom strategy only, optional: cookies set on the browser context before navigating -
   // use for sites that read delivery location/pincode from a cookie.
   cookies?: CookieSeed[];

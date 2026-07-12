@@ -83,6 +83,28 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
   logger.info("Sent in-stock alert", { targetId: target.id });
 }
 
+export async function notifyComingSoon(result: StockResult): Promise<void> {
+  const { target } = result;
+
+  const discordEmbed = {
+    title: target.label,
+    url: target.url,
+    color: 0xf1c40f, // yellow
+    fields: [
+      { name: "Status", value: result.status, inline: true },
+      { name: "Checked at", value: result.checkedAt, inline: true },
+    ],
+  };
+  const telegramText = `👀 *COMING SOON* — ${target.label}\nOpen the app and check manually.\n${target.url}\nChecked at: ${result.checkedAt}`;
+
+  await Promise.all([
+    postToDiscord(`👀 **COMING SOON** — ${target.label} — open the app and check manually`, discordEmbed),
+    postToTelegram(telegramText),
+  ]);
+
+  logger.info("Sent coming-soon alert", { targetId: target.id });
+}
+
 export async function notifyError(message: string): Promise<void> {
   await Promise.all([
     postToDiscord(`⚠️ Stock checker error: ${message}`),

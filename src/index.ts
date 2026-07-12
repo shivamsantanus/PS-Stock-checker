@@ -3,7 +3,7 @@ import { TARGETS } from "./targets";
 import { logger } from "./logger";
 import { StateManager } from "./stateManager";
 import { StockChecker } from "./scraper";
-import { hasAnyChannelConfigured, notifyBackInStock, notifyError } from "./notifier";
+import { hasAnyChannelConfigured, notifyBackInStock, notifyComingSoon, notifyError } from "./notifier";
 import { StockResult } from "./types";
 
 function sleep(ms: number): Promise<void> {
@@ -34,6 +34,11 @@ async function runCheckCycle(checker: StockChecker, state: StateManager): Promis
       const justCameInStock = previousStatus !== "IN_STOCK" && result.status === "IN_STOCK";
       if (justCameInStock) {
         await notifyBackInStock(result);
+      }
+
+      const justBecameComingSoon = previousStatus !== "COMING_SOON" && result.status === "COMING_SOON";
+      if (justBecameComingSoon) {
+        await notifyComingSoon(result);
       }
 
       await state.recordCheck(target.id, result.status);

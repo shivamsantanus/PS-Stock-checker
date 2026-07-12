@@ -16,13 +16,17 @@ function containsAny(text: string, values: string[]): boolean {
 }
 
 /**
- * outOfStockValues (if given) are checked first, since an explicit OOS
- * marker ("Out Of Stock", "Notify Me") is usually a more reliable signal on
- * a busy page than the mere presence of "add to cart" text, which can come
- * from an unrelated recommendation carousel. Falls back to OUT_OF_STOCK if
- * neither list matches - an inconclusive read should never look "in stock".
+ * comingSoonValues, then outOfStockValues, are checked before inStockValues:
+ * an explicit "Coming soon"/"Out Of Stock"/"Notify Me" marker is usually a
+ * more reliable signal on a busy page than the mere presence of "add to
+ * cart" text, which can come from an unrelated recommendation carousel.
+ * Falls back to OUT_OF_STOCK if nothing matches - an inconclusive read
+ * should never look "in stock".
  */
 function resolveStatus(text: string, target: Target): StockStatus {
+  if (target.comingSoonValues && containsAny(text, target.comingSoonValues)) {
+    return "COMING_SOON";
+  }
   if (target.outOfStockValues && containsAny(text, target.outOfStockValues)) {
     return "OUT_OF_STOCK";
   }

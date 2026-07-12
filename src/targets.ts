@@ -245,6 +245,9 @@ export const TARGETS: Target[] = [
       // on those. `ProductWrapperRightSection` is a styled-components class
       // that wraps only the real product's info column.
       selector: "div[class*='ProductWrapperRightSection']",
+      // Confirmed live 2026-07-12 (Bhubaneswar 751012, PS5 Digital Edition):
+      // Blinkit pre-lists some SKUs as orderable-later with this exact badge.
+      comingSoonValues: ["coming soon"],
       outOfStockValues: ["out of stock"],
       inStockValues: ["add"],
     },
@@ -410,6 +413,7 @@ export const TARGETS: Target[] = [
       { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
     ],
     selector: "div[class*='ProductWrapperRightSection']",
+    comingSoonValues: ["coming soon"],
     outOfStockValues: ["out of stock"],
     inStockValues: ["add"],
   },
@@ -482,6 +486,7 @@ export const TARGETS: Target[] = [
       { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
     ],
     selector: "div[class*='ProductWrapperRightSection']",
+    comingSoonValues: ["coming soon"],
     outOfStockValues: ["out of stock"],
     inStockValues: ["add"],
   },
