@@ -4,7 +4,7 @@ import { logger } from "./logger";
 import { StockResult } from "./types";
 
 export function hasAnyChannelConfigured(): boolean {
-  return Boolean(config.discordWebhookUrl) || Boolean(config.telegramBotToken && config.telegramChatId);
+  return Boolean(config.discordWebhookUrl) || Boolean(config.telegramBotToken && config.telegramChatIds.length > 0);
 }
 
 /**
@@ -39,26 +39,34 @@ async function postToDiscord(content: string, embed?: Record<string, unknown>): 
  * we never want a notification failure to take down the check loop.
  */
 async function postToTelegram(text: string): Promise<void> {
-  if (!config.telegramBotToken || !config.telegramChatId) return;
+  if (!config.telegramBotToken || config.telegramChatIds.length === 0) return;
 
-  try {
-    await axios.post(
-      `https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`,
-      {
-        chat_id: config.telegramChatId,
-        text,
-        parse_mode: "Markdown",
-        disable_web_page_preview: false,
-      },
-      { timeout: 10_000 }
-    );
-  } catch (err: any) {
-    logger.error("Failed to send Telegram notification", {
-      error: err.message,
-      status: err.response?.status,
-      body: err.response?.data,
-    });
-  }
+  // Fan the same message out to every configured chat (e.g. a private chat
+  // and a group). One failing chat must not stop delivery to the others, so
+  // each send is isolated and its own error is logged independently.
+  await Promise.all(
+    config.telegramChatIds.map(async (chatId) => {
+      try {
+        await axios.post(
+          `https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`,
+          {
+            chat_id: chatId,
+            text,
+            parse_mode: "Markdown",
+            disable_web_page_preview: false,
+          },
+          { timeout: 10_000 }
+        );
+      } catch (err: any) {
+        logger.error("Failed to send Telegram notification", {
+          chatId,
+          error: err.message,
+          status: err.response?.status,
+          body: err.response?.data,
+        });
+      }
+    })
+  );
 }
 
 export async function notifyBackInStock(result: StockResult): Promise<void> {

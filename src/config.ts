@@ -8,6 +8,20 @@ function optionalEnv(name: string): string | undefined {
   return value && value.trim().length > 0 ? value : undefined;
 }
 
+/**
+ * Parses a comma-separated env var into a list of trimmed, non-empty values.
+ * Lets a single TELEGRAM_CHAT_ID setting fan a notification out to several
+ * chats at once (e.g. a private chat AND a group).
+ */
+function optionalList(name: string): string[] {
+  const raw = process.env[name];
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+}
+
 function optionalInt(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -26,7 +40,9 @@ export const config = {
   // must be configured - validated at startup in index.ts.
   discordWebhookUrl: optionalEnv("DISCORD_WEBHOOK_URL"),
   telegramBotToken: optionalEnv("TELEGRAM_BOT_TOKEN"),
-  telegramChatId: optionalEnv("TELEGRAM_CHAT_ID"),
+  // Accepts one ID or a comma-separated list, so a single alert can be
+  // delivered to multiple chats (e.g. "1933043199,-5469712170").
+  telegramChatIds: optionalList("TELEGRAM_CHAT_ID"),
 
   checkIntervalMinutes: optionalInt("CHECK_INTERVAL_MINUTES", 10),
   jitterSeconds: optionalInt("JITTER_SECONDS", 30),
