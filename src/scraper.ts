@@ -1,8 +1,8 @@
-import { Browser, BrowserContext, chromium } from "playwright";
+import { Browser, BrowserContext, Page, chromium } from "playwright";
 import axios from "axios";
 import { config } from "./config";
 import { logger } from "./logger";
-import { StockResult, StockStatus, Target } from "./types";
+import { InStockConfirmation, StockResult, StockStatus, Target } from "./types";
 
 const COMMON_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
@@ -31,6 +31,46 @@ function resolveStatus(text: string, target: Target): StockStatus {
     return "OUT_OF_STOCK";
   }
   return containsAny(text, target.inStockValues) ? "IN_STOCK" : "OUT_OF_STOCK";
+}
+
+/**
+ * Reads an element's visible text (innerText, falling back to textContent for
+ * non-rendered nodes), or "" if the selector isn't present. Never throws - a
+ * missing confirmation element should fail the guard, not crash the check.
+ */
+async function readSelectorText(page: Page, selector: string): Promise<string> {
+  const locator = page.locator(selector).first();
+  if ((await locator.count()) === 0) return "";
+  let text = (await locator.innerText().catch(() => "")).trim();
+  if (!text) {
+    text = ((await locator.textContent().catch(() => "")) ?? "").trim();
+  }
+  return text;
+}
+
+/**
+ * Returns null if every confirmation holds (in-stock read is trustworthy),
+ * or a short human-readable reason string for the first one that fails.
+ * See InStockConfirmation for why this guard exists.
+ */
+async function failedInStockConfirmation(
+  page: Page,
+  confirmations: InStockConfirmation[]
+): Promise<string | null> {
+  for (const c of confirmations) {
+    const text = await readSelectorText(page, c.selector);
+    if (c.matches) {
+      // Case-insensitive; `matches` is a trusted, hand-written pattern from
+      // targets.ts (not user input), so building a RegExp from it is safe.
+      if (!new RegExp(c.matches, "i").test(text)) {
+        return `"${c.selector}" text ${JSON.stringify(text.slice(0, 60))} did not match /${c.matches}/i`;
+      }
+    }
+    if (c.rejectAny && containsAny(text, c.rejectAny)) {
+      return `"${c.selector}" text ${JSON.stringify(text.slice(0, 60))} contained a rejected value`;
+    }
+  }
+  return null;
 }
 
 /** Resolves a dot-path like "a.b.c" against a parsed JSON object. */
@@ -130,7 +170,23 @@ export class StockChecker {
       if (!rawText) {
         rawText = ((await locator.textContent()) ?? "").trim();
       }
-      return { status: resolveStatus(rawText, target), detail: rawText };
+
+      const status = resolveStatus(rawText, target);
+
+      // An IN_STOCK read on a pincode-gated site is only trusted once we can
+      // positively confirm a real serviceable delivery store resolved - see
+      // InStockConfirmation. If we can't, downgrade to UNKNOWN so no false
+      // "back in stock" alert fires (rather than believing the default
+      // no-location "Add to Cart" view).
+      if (status === "IN_STOCK" && target.inStockConfirmations?.length) {
+        const reason = await failedInStockConfirmation(page, target.inStockConfirmations);
+        if (reason) {
+          logger.warn(`Discarding unconfirmed IN_STOCK read for "${target.id}"`, { reason });
+          return { status: "UNKNOWN", detail: `unconfirmed in-stock: ${reason}` };
+        }
+      }
+
+      return { status, detail: rawText };
     } finally {
       await context?.close();
     }

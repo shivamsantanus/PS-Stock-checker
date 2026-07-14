@@ -1,4 +1,27 @@
-import { Target } from "./types";
+import { InStockConfirmation, Target } from "./types";
+
+/**
+ * Shared IN_STOCK guard for every Zepto target - see InStockConfirmation in
+ * types.ts for the full rationale. In short: Zepto's default/no-location view
+ * of an out-of-stock product shows the SAME "Add to Cart" CTA as a genuinely
+ * in-stock serviceable store, so without these two positive checks the target
+ * false-positives whenever the pincode doesn't truly resolve (slow re-render,
+ * non-serviceable area, or - the common one - a GitHub Actions runner hitting
+ * Zepto from a non-India datacenter IP). Both checks were live-verified
+ * 2026-07-14 across an in-stock store (560066/Hagadur), an out-of-stock
+ * serviceable store (147002/Patiala), and the default no-location view.
+ */
+const ZEPTO_IN_STOCK_CONFIRMATIONS: InStockConfirmation[] = [
+  // 1. The location picker was actually applied: the header address stops
+  //    reading the default "Select Location" prompt once a real address is set.
+  { selector: "[data-testid='user-address']", rejectAny: ["select location"] },
+  // 2. A serviceable dark store resolved: Zepto renders a delivery ETA
+  //    ("N minutes") in the header for ANY serviceable location - in-stock or
+  //    out-of-stock alike - but never on the unresolved/default view. Its
+  //    presence is what separates a real per-pincode read from the default
+  //    "Add to Cart" fallback that caused the false alerts.
+  { selector: "header", matches: "\\d+\\s*min" },
+];
 
 /**
  * --- Findings from live testing against each site while building this ---
@@ -322,6 +345,7 @@ export const TARGETS: Target[] = [
       selector: ".KQfnF.ckhcV",
       outOfStockValues: ["notify me", "out of stock"],
       inStockValues: ["add to cart"],
+      inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
     },
     {
       // Same product family/site behavior as zepto-ps5-* above (standard
@@ -342,6 +366,7 @@ export const TARGETS: Target[] = [
       selector: ".KQfnF.ckhcV",
       outOfStockValues: ["notify me", "out of stock"],
       inStockValues: ["add to cart"],
+      inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
     },
   ]),
 
@@ -377,6 +402,7 @@ export const TARGETS: Target[] = [
     selector: ".KQfnF.ckhcV",
     outOfStockValues: ["notify me", "out of stock"],
     inStockValues: ["add to cart"],
+    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
   },
   {
     id: "zepto-ps5-digital-kadugodi-560067",
@@ -396,6 +422,7 @@ export const TARGETS: Target[] = [
     selector: ".KQfnF.ckhcV",
     outOfStockValues: ["notify me", "out of stock"],
     inStockValues: ["add to cart"],
+    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
   },
   {
     id: "blinkit-ps5-kadugodi-560067",
@@ -450,6 +477,7 @@ export const TARGETS: Target[] = [
     selector: ".KQfnF.ckhcV",
     outOfStockValues: ["notify me", "out of stock"],
     inStockValues: ["add to cart"],
+    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
   },
   {
     id: "zepto-ps5-digital-jeevanbhimanagar-560075",
@@ -469,6 +497,7 @@ export const TARGETS: Target[] = [
     selector: ".KQfnF.ckhcV",
     outOfStockValues: ["notify me", "out of stock"],
     inStockValues: ["add to cart"],
+    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
   },
   {
     id: "blinkit-ps5-jeevanbhimanagar-560075",
@@ -481,6 +510,82 @@ export const TARGETS: Target[] = [
         action: "fill",
         selector: "input[name='select-locality']",
         value: "Jeevan Bheema Nagar LIC Colony 560075",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+    ],
+    selector: "div[class*='ProductWrapperRightSection']",
+    comingSoonValues: ["coming soon"],
+    outOfStockValues: ["out of stock"],
+    inStockValues: ["add"],
+  },
+
+  // --- User-specific address, added 2026-07-13: WP27+FQR Kodathi Wipro
+  // Gate, Snehadaan Hospital Rd, opposite Road, Sarjapura, Ambedkar Nagar,
+  // Chikkabellandur, Bengaluru, Karnataka 560035. ---------------------------
+  //
+  // NOT part of the pincode flatMap above, same reasoning as the Kadugodi
+  // block: 560035 isn't in that list at all yet, and this is a specific
+  // address rather than a bare pincode. Confirmed live 2026-07-13 that
+  // searching "Chikkabellandur Sarjapura 560035" and clicking the first
+  // result resolves to a real, distinct dark-store zone on both platforms -
+  // Zepto: "Bellanduru - 464, Sarjapur - Marathahalli Road, Bellanduru,
+  // Bangalore, Karnataka"; Blinkit: "Sarjapur Main Rd, Janatha Colony,
+  // Chikkabellandur, Bengaluru, Karnataka" - not the same store as any
+  // existing target in this file. Both editions read OUT_OF_STOCK on Zepto
+  // ("Notify Me when back in stock") and OUT_OF_STOCK on Blinkit ("Out of
+  // stock") at verification time.
+  {
+    id: "zepto-ps5-chikkabellandur-560035",
+    label: "Zepto - Chikkabellandur, Sarjapura, Bangalore 560035",
+    url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "[data-testid='user-address']" },
+      {
+        action: "fill",
+        selector: "[data-testid='address-search-input'] input",
+        value: "Chikkabellandur Sarjapura 560035",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
+    ],
+    selector: ".KQfnF.ckhcV",
+    outOfStockValues: ["notify me", "out of stock"],
+    inStockValues: ["add to cart"],
+    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
+  },
+  {
+    id: "zepto-ps5-digital-chikkabellandur-560035",
+    label: "Zepto - Chikkabellandur, Sarjapura, Bangalore 560035 (Digital Edition)",
+    url: "https://www.zepto.com/pn/playstation-5-console-digital/pvid/4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "[data-testid='user-address']" },
+      {
+        action: "fill",
+        selector: "[data-testid='address-search-input'] input",
+        value: "Chikkabellandur Sarjapura 560035",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
+    ],
+    selector: ".KQfnF.ckhcV",
+    outOfStockValues: ["notify me", "out of stock"],
+    inStockValues: ["add to cart"],
+    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
+  },
+  {
+    id: "blinkit-ps5-chikkabellandur-560035",
+    label: "Blinkit - Chikkabellandur, Sarjapura, Bangalore 560035",
+    url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+      {
+        action: "fill",
+        selector: "input[name='select-locality']",
+        value: "Chikkabellandur Sarjapura 560035",
         waitAfterMs: 2000,
       },
       { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },

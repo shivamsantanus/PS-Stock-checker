@@ -22,6 +22,36 @@ export interface CookieSeed {
 }
 
 /**
+ * A post-read sanity check for location-gated sites (dom strategy only).
+ * Only consulted when a target would otherwise read IN_STOCK - if any
+ * configured confirmation fails, that read is downgraded to UNKNOWN (no
+ * alert) rather than trusted.
+ *
+ * Why this exists: on Zepto (and the same risk on any pincode-gated site),
+ * the DEFAULT no-location view of an out-of-stock product shows the exact
+ * same "Add to Cart" CTA as a genuinely in-stock, serviceable store. So any
+ * time the location picker doesn't actually resolve a real Indian delivery
+ * store - a slow re-render, a non-serviceable pincode, or (the big one) a
+ * GitHub Actions runner hitting the site from a non-India datacenter IP -
+ * the buy-box falls back to that default "Add to Cart" and the target
+ * false-positives as "back in stock". These confirmations demand positive
+ * proof that a real serviceable store resolved before an in-stock read is
+ * believed. See the Zepto targets in targets.ts for the concrete signals.
+ */
+export interface InStockConfirmation {
+  // Element whose text is inspected for this confirmation.
+  selector: string;
+  // If set, the guard passes only when the element's text matches this
+  // (case-insensitive) regular expression - e.g. "\\d+\\s*min" to require a
+  // delivery-ETA badge, which only appears once a serviceable store resolves.
+  matches?: string;
+  // If set, the guard fails when the element's text contains ANY of these
+  // (case-insensitive substrings) - e.g. "select location", which means the
+  // location picker was never actually applied.
+  rejectAny?: string[];
+}
+
+/**
  * A single location to monitor. `url` is the page (dom strategy) or
  * JSON endpoint (api strategy) to hit for that specific location.
  */
@@ -56,6 +86,11 @@ export interface Target {
   // dom strategy only, optional: UI steps run after page load and before reading
   // `selector` - use to type a pincode into a location picker and confirm it.
   preActions?: PreAction[];
+  // dom strategy only, optional: extra checks that must all hold before a
+  // would-be IN_STOCK read is trusted - otherwise it's downgraded to UNKNOWN.
+  // See InStockConfirmation for the rationale (guards against false "back in
+  // stock" alerts from the default/no-location view on pincode-gated sites).
+  inStockConfirmations?: InStockConfirmation[];
 }
 
 export interface StockResult {
