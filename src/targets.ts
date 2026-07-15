@@ -212,6 +212,12 @@ const RELIANCE_DIGITAL_PINCODES: { pincode: string; city: string }[] = [
   { pincode: "121001", city: "Faridabad" },
   { pincode: "221010", city: "Varanasi" },
   { pincode: "400701", city: "Ghansoli, Navi Mumbai" },
+  // Added 2026-07-16 - Pune/Mumbai pincode sweep requested by the user.
+  // One representative pincode each (411001/Pune, 400013/Mumbai) per this
+  // list's own dedup policy above - see the quick-commerce flatMap list
+  // below for all 6 requested pincodes individually.
+  { pincode: "411001", city: "Pune" },
+  { pincode: "400013", city: "Mumbai" },
 ];
 
 /**
@@ -506,6 +512,13 @@ export const TARGETS: Target[] = [
       { pincode: "560114", city: "Bangalore" },
       // Added 2026-07-12 - Gagal Home, Sector 6, Ghansoli, Navi Mumbai.
       { pincode: "400701", city: "Ghansoli, Navi Mumbai" },
+      // Added 2026-07-16 - Pune/Mumbai pincode sweep requested by the user.
+      { pincode: "411004", city: "Pune" },
+      { pincode: "411005", city: "Pune" },
+      { pincode: "411016", city: "Pune" },
+      { pincode: "411001", city: "Pune" },
+      { pincode: "411045", city: "Pune" },
+      { pincode: "400013", city: "Mumbai" },
     ] as { pincode: string; city: string }[]
   ).flatMap(({ pincode, city }): Target[] => [
     {
