@@ -149,6 +149,21 @@ const RELIANCE_DIGITAL_BEARER = "Bearer NjQ1YTA1Nzg3NWQ4YzQ4ODJiMDk2ZjdlOl9fLU80
  * regional store inventory, NOT one national pool. That's why these fan out
  * per city like the quick-commerce targets (one representative pincode per
  * city - nearby pincodes resolve to the same store).
+ *
+ * KNOWN LIMIT - PHANTOM STORE STOCK (live case 2026-07-15, same day): a
+ * qty-4 offer fulfilled from the "Mantri Bangalore" retail store passed
+ * EVERY anonymous layer - this endpoint, and even a real cart-add with RD's
+ * own auto-allocator ({out_of_stock:false, deliverable:true, is_valid:true})
+ * - yet the actual payment step rejected it with "article not available".
+ * The order-time allocation check lives behind the login wall and is not
+ * reachable anonymously, and no field visible out here distinguishes such
+ * offers from genuine ones (tat/distance/delivery_promise are null for ALL
+ * products, orderable bestsellers included; the quantity being frozen at 4
+ * all day was the only tell). Mitigation: detailJsonPath "store" puts the
+ * fulfilling store's name + count into the alert itself, so the reader can
+ * treat a mall-store source with suspicion but still race for warehouse-
+ * looking sources. Treat an RD alert as "offer visible for your pincode -
+ * go try NOW, but payment may still fail", not a purchase guarantee.
  */
 function relianceDigitalTarget(opts: {
   idSuffix: string;
@@ -173,6 +188,10 @@ function relianceDigitalTarget(opts: {
     // nothing, falling through to the safe OUT_OF_STOCK default.
     jsonPath: "$",
     inStockValues: ["article_id"],
+    // Surfaces the fulfilling store ({uid, name, count}) in the alert - the
+    // reader's only defense against phantom retail-store stock, see the
+    // KNOWN LIMIT note above.
+    detailJsonPath: "store",
   };
 }
 

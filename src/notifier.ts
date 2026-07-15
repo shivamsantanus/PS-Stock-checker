@@ -74,6 +74,9 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
   // Prefer the human-facing product page over a raw API endpoint - an alert
   // is for racing to buy, so the link must open something purchasable.
   const linkUrl = target.displayUrl ?? target.url;
+  // Opt-in extra context (see Target.detailJsonPath) - e.g. which store an
+  // offer is fulfilled from, so the reader can judge how real the stock is.
+  const detailLine = target.detailJsonPath && result.detail ? `\nSource: ${result.detail}` : "";
 
   const discordEmbed = {
     title: target.label,
@@ -82,9 +85,10 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
     fields: [
       { name: "Status", value: result.status, inline: true },
       { name: "Checked at", value: result.checkedAt, inline: true },
+      ...(target.detailJsonPath && result.detail ? [{ name: "Source", value: result.detail, inline: false }] : []),
     ],
   };
-  const telegramText = `🚨 *IN STOCK* — ${target.label}\n${linkUrl}\nChecked at: ${result.checkedAt}`;
+  const telegramText = `🚨 *IN STOCK* — ${target.label}\n${linkUrl}${detailLine}\nChecked at: ${result.checkedAt}`;
 
   await Promise.all([
     postToDiscord(`🚨 **IN STOCK** — ${target.label}`, discordEmbed),

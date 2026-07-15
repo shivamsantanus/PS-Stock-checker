@@ -81,6 +81,13 @@ export interface Target {
   requestHeaders?: Record<string, string>;
   // api strategy only, optional: JSON body sent with a POST request.
   requestBody?: unknown;
+  // api strategy only, optional: dot-path whose value becomes the result
+  // `detail` AND gets appended to notifications (opt-in - alerts stay
+  // unchanged for targets that don't set this). Use when the response
+  // carries context the human needs to judge an alert - e.g. Reliance
+  // Digital's fulfilling store, since a mall-store-sourced offer can still
+  // be rejected as phantom inventory at payment time.
+  detailJsonPath?: string;
   // Values (case-insensitive substring match) that count as "in stock" for this target.
   inStockValues: string[];
   // Optional: values that count as "out of stock", checked BEFORE inStockValues.

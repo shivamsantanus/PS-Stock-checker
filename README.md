@@ -136,6 +136,17 @@ done while building this — not guesses:
   offer for Bangalore 560075 and `{}` for Patiala/Cuttack/Lucknow. RD
   consoles ship from regional store inventory, so targets fan out per city
   (one representative pincode each), like the quick-commerce platforms.
+  **Second hard-won lesson — phantom store stock (live case, same day):**
+  an offer sourced from a physical retail store ("Mantri Bangalore", qty 4)
+  passed every anonymous check — the article endpoint AND a real cart-add
+  validated by RD's own allocator — yet payment rejected it with "article
+  not available". The order-time inventory check sits behind the login wall;
+  nothing visible anonymously distinguishes such offers (TAT/distance/
+  delivery-promise are null for all products, orderable ones included). RD
+  alerts therefore include the fulfilling store's name via `detailJsonPath`:
+  read "Source:" in the alert — a mall-store source may be display/reserved
+  units that fail at payment; treat every RD alert as "go try immediately,"
+  not a guarantee.
 - **Croma — verified via internal API, high confidence,
   location-independent in practice.** The website itself hard-blocks
   automation (Akamai edge 403 on every non-headful load — curl, axios, and

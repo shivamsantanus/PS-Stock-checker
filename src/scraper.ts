@@ -226,6 +226,17 @@ export class StockChecker {
     // delivery-promise response, where in-stock means the promiseLine array
     // has entries and out-of-stock means an unavailableReason appears.
     const rawText = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
-    return { status: resolveStatus(rawText, target), detail: rawText.slice(0, 300) };
+
+    // detailJsonPath (optional) swaps the debug detail for a human-facing
+    // extract that the notifier appends to alerts - see Target.detailJsonPath.
+    let detail = rawText.slice(0, 300);
+    if (target.detailJsonPath) {
+      const detailValue = resolveJsonPath(response.data, target.detailJsonPath);
+      if (detailValue !== undefined) {
+        detail = (typeof detailValue === "object" ? JSON.stringify(detailValue) : String(detailValue)).slice(0, 300);
+      }
+    }
+
+    return { status: resolveStatus(rawText, target), detail };
   }
 }
