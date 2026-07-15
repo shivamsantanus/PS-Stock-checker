@@ -73,8 +73,15 @@ async function failedInStockConfirmation(
   return null;
 }
 
-/** Resolves a dot-path like "a.b.c" against a parsed JSON object. */
+/**
+ * Resolves a dot-path like "a.b.c" against a parsed JSON object. The special
+ * path "$" returns the whole response - for APIs whose availability signal
+ * is "the response has content at all" (e.g. Reliance Digital's per-pincode
+ * article endpoint returns a full seller offer when deliverable and a bare
+ * `{}` when not - there is no stable inner key to point at in both cases).
+ */
 function resolveJsonPath(obj: unknown, dotPath: string): unknown {
+  if (dotPath === "$") return obj;
   return dotPath.split(".").reduce<unknown>((acc, key) => {
     if (acc && typeof acc === "object" && key in (acc as Record<string, unknown>)) {
       return (acc as Record<string, unknown>)[key];

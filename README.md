@@ -118,15 +118,24 @@ done while building this — not guesses:
   `offers.availability` — far more reliable than Flipkart's own
   auto-generated/rotating CSS classes, which have no stable selector at all.
 - **Reliance Digital — verified via internal API, high confidence,
-  location-independent.** The site runs on the Fynd commerce platform, whose
-  storefront API (`/api/service/application/catalog/v1.0/products/<slug>/sizes/`)
-  returns a clean `sellable: true/false` plus live quantity. Auth is the
-  static public Bearer token the site's own frontend sends (embedded in its
-  JS bundle — re-grab from DevTools if it ever rotates); the request-signing
-  header the site also sends is not enforced server-side (verified live
-  2026-07-15). National availability, same caveat class as Sony Center.
-  The earlier dom-strategy blockers (an "Apply" control that's a `<p>` not a
-  button, and a Vue placeholder buy-box) are moot — no page load needed.
+  location-DEPENDENT (checked per pincode).** The site runs on the Fynd
+  commerce platform. Auth is the static public Bearer token the site's own
+  frontend sends (embedded in its JS bundle — re-grab from DevTools if it
+  ever rotates); the request-signing header the site also sends is not
+  enforced server-side (verified live 2026-07-15). The earlier dom-strategy
+  blockers (an "Apply" control that's a `<p>` not a button, and a Vue
+  placeholder buy-box) are moot — no page load needed.
+  **Hard-won lesson (live false alert, same day as wiring):** the catalog
+  sizes endpoint's `sellable: true` — and even the PDP's own JSON-LD
+  "InStock" markup — is a *national catalog* flag meaning "some RD store
+  somewhere holds this item," not "you can order it." The real buy-box
+  signal is the per-pincode article endpoint
+  (`/catalog/v2.0/products/<slug>/sizes/OS/price/?pincode=…`), which returns
+  a seller offer (article id + live quantity) when deliverable and a bare
+  `{}` when not. Verified live: the same SKU at the same moment was a qty-4
+  offer for Bangalore 560075 and `{}` for Patiala/Cuttack/Lucknow. RD
+  consoles ship from regional store inventory, so targets fan out per city
+  (one representative pincode each), like the quick-commerce platforms.
 - **Croma — verified via internal API, high confidence,
   location-independent in practice.** The website itself hard-blocks
   automation (Akamai edge 403 on every non-headful load — curl, axios, and

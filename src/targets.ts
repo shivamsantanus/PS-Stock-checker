@@ -125,12 +125,42 @@ function cromaTarget(opts: { idSuffix: string; label: string; itemId: string; pr
  */
 const RELIANCE_DIGITAL_BEARER = "Bearer NjQ1YTA1Nzg3NWQ4YzQ4ODJiMDk2ZjdlOl9fLU80NC00aQ==";
 
-/** Builds one Reliance Digital target - availability via Fynd's sizes API. */
-function relianceDigitalTarget(opts: { idSuffix: string; label: string; slug: string }): Target {
+/**
+ * Builds one per-pincode Reliance Digital target - availability via Fynd's
+ * article/price endpoint, the same one the PDP buy-box is driven by.
+ *
+ * FALSE-POSITIVE FOUND AND FIXED 2026-07-15 (same day as the original
+ * wiring): the first version of these targets read the catalog sizes
+ * endpoint's `sellable` flag, which fired a real alert while the user's own
+ * PDP view showed nothing purchasable. Root cause: `sellable` (and the
+ * PDP's own JSON-LD "InStock" markup) is a NATIONAL catalog flag meaning
+ * "some RD store somewhere holds this article" - it is not deliverability.
+ * The page's real buy-box signal is this per-pincode endpoint:
+ *
+ *   GET /catalog/v2.0/products/<slug>/sizes/OS/price/?pincode=<pin>
+ *     deliverable    -> full seller offer: article_id, live quantity, price,
+ *                       and the fulfilling store's long_lat
+ *     not deliverable -> HTTP 200 with a bare `{}` (no inner key exists at
+ *                       all, hence jsonPath "$" + whole-body matching)
+ *
+ * Live-verified 2026-07-15 across the priority cities: Bangalore 560075 got
+ * a qty-4 offer from a Bangalore store while Patiala/Cuttack/Lucknow got
+ * `{}` for the same SKU at the same moment - i.e. RD fulfills consoles from
+ * regional store inventory, NOT one national pool. That's why these fan out
+ * per city like the quick-commerce targets (one representative pincode per
+ * city - nearby pincodes resolve to the same store).
+ */
+function relianceDigitalTarget(opts: {
+  idSuffix: string;
+  label: string;
+  slug: string;
+  pincode: string;
+  city: string;
+}): Target {
   return {
-    id: `reliancedigital-${opts.idSuffix}`,
-    label: `Reliance Digital - ${opts.label}`,
-    url: `https://www.reliancedigital.in/api/service/application/catalog/v1.0/products/${opts.slug}/sizes/`,
+    id: `reliancedigital-${opts.idSuffix}-${opts.pincode}`,
+    label: `Reliance Digital - ${opts.city} ${opts.pincode} (${opts.label})`,
+    url: `https://www.reliancedigital.in/api/service/application/catalog/v2.0/products/${opts.slug}/sizes/OS/price/?pincode=${opts.pincode}`,
     displayUrl: `https://www.reliancedigital.in/product/${opts.slug}`,
     strategy: "api",
     requestHeaders: {
@@ -138,16 +168,32 @@ function relianceDigitalTarget(opts: { idSuffix: string; label: string; slug: st
       authorization: RELIANCE_DIGITAL_BEARER,
       "x-currency-code": "INR",
     },
-    // `sellable` is a top-level boolean - live-verified 2026-07-15 to read
-    // true (with real quantities) on the three orderable PS5 consoles and
-    // false on the not-orderable bundle listings. Like Sony Center/Flipkart,
-    // this is national availability, not per-pincode - the sizes response
-    // was byte-identical with and without a pincode location header.
-    jsonPath: "sellable",
-    outOfStockValues: ["false"],
-    inStockValues: ["true"],
+    // Whole-body match (see resolveJsonPath): a deliverable offer always
+    // carries `article_id`; the not-deliverable body is `{}` and matches
+    // nothing, falling through to the safe OUT_OF_STOCK default.
+    jsonPath: "$",
+    inStockValues: ["article_id"],
   };
 }
+
+/**
+ * One representative pincode per priority city (nearby pincodes in the
+ * flatMap list resolve to the same regional store, so checking all of them
+ * would just repeat the same answer 3x per SKU).
+ */
+const RELIANCE_DIGITAL_PINCODES: { pincode: string; city: string }[] = [
+  { pincode: "147002", city: "Patiala" },
+  { pincode: "753004", city: "Cuttack" },
+  { pincode: "122098", city: "Gurugram" },
+  { pincode: "751012", city: "Bhubaneswar" },
+  { pincode: "248001", city: "Dehradun" },
+  { pincode: "226016", city: "Lucknow" },
+  { pincode: "560075", city: "Bangalore" },
+  { pincode: "177211", city: "Amb" },
+  { pincode: "121001", city: "Faridabad" },
+  { pincode: "221010", city: "Varanasi" },
+  { pincode: "400701", city: "Ghansoli, Navi Mumbai" },
+];
 
 /**
  * --- Findings from live testing against each site while building this ---
@@ -221,14 +267,16 @@ function relianceDigitalTarget(opts: { idSuffix: string; label: string; slug: st
  *     the public `oms-apim-subscription-key` header every visitor's browser
  *     sends. See the Croma targets below for the verified in/out-of-stock
  *     response shapes.
- *   - Reliance Digital: runs on the Fynd commerce platform, which exposes
- *     GET /api/service/application/catalog/v1.0/products/<slug>/sizes/
- *     returning a clean `sellable: true/false` (plus live quantity). Auth is
- *     a static public Bearer token from the frontend bundle; the x-fp-
+ *   - Reliance Digital: runs on the Fynd commerce platform. Auth is a
+ *     static public Bearer token from the frontend bundle; the x-fp-
  *     signature request-signing header the site also sends is NOT enforced
  *     server-side (verified live). The old dom-strategy blockers (unreachable
  *     "Apply" control - it's a <p>, not a button - and the empty Vue
  *     placeholder buy-box) are moot since the API needs no page at all.
+ *     CAUTION: the catalog sizes endpoint's `sellable` flag is a NATIONAL
+ *     "exists in some store" flag and fired a live false alert - the real
+ *     per-pincode deliverability signal is the v2.0 article/price endpoint;
+ *     see the relianceDigitalTarget factory for the full post-mortem.
  *
  * Excluded after live testing - not shipped, to avoid pretending confidence
  * that testing disproved:
@@ -278,26 +326,35 @@ export const TARGETS: Target[] = [
   },
 
   // --- Reliance Digital, added 2026-07-15 after a missed restock the
-  // previous day - "api" strategy against Fynd's public sizes endpoint, see
-  // relianceDigitalTarget/RELIANCE_DIGITAL_BEARER above for the full
-  // findings. At wiring time: slim disc sellable=true qty 9, slim digital
-  // sellable=true qty 6, digital edition sellable=true qty 1 - all three
-  // will therefore show IN_STOCK on the first check cycle. -----------------
-  relianceDigitalTarget({
-    idSuffix: "ps5-slim",
-    label: "PS5 Slim Console (Disc)",
-    slug: "sony-playstation-ps5-slim-console-luh1rv-7537998",
-  }),
-  relianceDigitalTarget({
-    idSuffix: "ps5-slim-digital",
-    label: "PS5 Slim Digital Console",
-    slug: "sony-playstation-ps5-slim-digital-console-luh1rv-7537999",
-  }),
-  relianceDigitalTarget({
-    idSuffix: "ps5-digital-edition",
-    label: "PS5 Digital Edition Console",
-    slug: "sony-playstation-5-digital-edition-console",
-  }),
+  // previous day; reworked to per-pincode targets the SAME day after the
+  // original national `sellable` check fired a false alert - see the
+  // relianceDigitalTarget factory above for the root cause and the verified
+  // per-pincode contract. At rework time: Bangalore 560075 read a live
+  // qty-4 offer (genuinely orderable) while Patiala/Cuttack/Lucknow read
+  // `{}` (not deliverable) for the same SKUs at the same moment. ------------
+  ...RELIANCE_DIGITAL_PINCODES.flatMap(({ pincode, city }): Target[] => [
+    relianceDigitalTarget({
+      idSuffix: "ps5-slim",
+      label: "PS5 Slim Console (Disc)",
+      slug: "sony-playstation-ps5-slim-console-luh1rv-7537998",
+      pincode,
+      city,
+    }),
+    relianceDigitalTarget({
+      idSuffix: "ps5-slim-digital",
+      label: "PS5 Slim Digital Console",
+      slug: "sony-playstation-ps5-slim-digital-console-luh1rv-7537999",
+      pincode,
+      city,
+    }),
+    relianceDigitalTarget({
+      idSuffix: "ps5-digital-edition",
+      label: "PS5 Digital Edition Console",
+      slug: "sony-playstation-5-digital-edition-console",
+      pincode,
+      city,
+    }),
+  ]),
 
   // --- Croma, added 2026-07-15 alongside Reliance Digital - "api" strategy
   // POST against the OMS delivery-promise endpoint the PDP itself uses, see
