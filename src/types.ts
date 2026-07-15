@@ -59,11 +59,28 @@ export interface Target {
   id: string; // stable unique key, used for state tracking - never change once set
   label: string; // human readable name shown in logs/notifications
   url: string;
+  // Optional: the human-facing product page to link in notifications, for api
+  // targets whose `url` is a raw JSON/inventory endpoint that would be useless
+  // to click when racing to buy (e.g. Croma's OMS POST endpoint). Falls back
+  // to `url` when unset.
+  displayUrl?: string;
   strategy: CheckStrategy;
   // dom strategy: CSS selector whose text/attribute reveals stock state
   selector?: string;
   // api strategy: dot-path into the JSON response, e.g. "data.availability.status"
   jsonPath?: string;
+  // api strategy only, optional: HTTP method (default GET). Some retailers'
+  // real availability oracle is a POST (e.g. Croma's OMS delivery-promise
+  // endpoint takes the product + pincode in a JSON body).
+  method?: "GET" | "POST";
+  // api strategy only, optional: extra request headers merged over the
+  // defaults (so they can also override Accept etc). Needed for storefront
+  // APIs that require an app token - note these are the PUBLIC tokens every
+  // visitor's browser sends (embedded in the site's own frontend bundle),
+  // not user secrets.
+  requestHeaders?: Record<string, string>;
+  // api strategy only, optional: JSON body sent with a POST request.
+  requestBody?: unknown;
   // Values (case-insensitive substring match) that count as "in stock" for this target.
   inStockValues: string[];
   // Optional: values that count as "out of stock", checked BEFORE inStockValues.

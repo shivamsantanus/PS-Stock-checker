@@ -195,11 +195,17 @@ export class StockChecker {
   private async checkApi(target: Target): Promise<{ status: StockStatus; detail: string }> {
     if (!target.jsonPath) throw new Error(`Target "${target.id}" uses "api" strategy but has no jsonPath`);
 
-    const response = await axios.get(target.url, {
+    const response = await axios.request({
+      url: target.url,
+      method: target.method ?? "GET",
+      data: target.requestBody,
       timeout: config.requestTimeoutMs,
       headers: {
         "User-Agent": config.userAgent,
         ...COMMON_HEADERS,
+        // Target-specific headers last so they can override the defaults
+        // (e.g. Accept: application/json for a JSON storefront API).
+        ...target.requestHeaders,
       },
     });
 
@@ -208,7 +214,11 @@ export class StockChecker {
       throw new Error(`jsonPath "${target.jsonPath}" not found in response for target "${target.id}"`);
     }
 
-    const rawText = String(value);
-    return { status: resolveStatus(rawText, target), detail: rawText };
+    // Objects/arrays are matched against their JSON text: an availability
+    // signal is sometimes structural rather than a scalar - e.g. Croma's
+    // delivery-promise response, where in-stock means the promiseLine array
+    // has entries and out-of-stock means an unavailableReason appears.
+    const rawText = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
+    return { status: resolveStatus(rawText, target), detail: rawText.slice(0, 300) };
   }
 }

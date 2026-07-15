@@ -66,6 +66,15 @@ Edit `src/targets.ts`. Each entry is either:
   `jsonPath` out of the JSON response. Use this whenever you can find the
   underlying JSON endpoint (check the browser Network tab) — it's faster
   and far less likely to trip bot detection than a full browser render.
+  Optional extras for storefront APIs that need more than a bare GET:
+  `method: "POST"` + `requestBody` (a JSON body, e.g. Croma's
+  delivery-promise payload), `requestHeaders` (merged over the defaults —
+  for public app tokens like Reliance Digital's Bearer or Croma's
+  subscription key), and `displayUrl` (the human-facing product page to
+  link in notifications instead of the raw API endpoint). If `jsonPath`
+  resolves to an object/array, matching runs against its JSON text — so a
+  structural signal like "the promiseLine array has entries" works with
+  plain substring values.
 
 `inStockValues` is a list of case-insensitive substrings; if the scraped
 text/value contains any of them, the target is considered `IN_STOCK`.
@@ -108,13 +117,34 @@ done while building this — not guesses:
   (schema.org markup, kept stable for Google Shopping/SEO) with
   `offers.availability` — far more reliable than Flipkart's own
   auto-generated/rotating CSS classes, which have no stable selector at all.
-- **Excluded after live testing, not shipped:** Croma (blocked outright,
-  HTTP 403 on a plain page load), Vijay Sales (a real OOS/in-stock signal
-  exists, but the page interleaves this product with an unrelated "related
-  products" carousel using the same classes — `.first()` picked up the wrong
-  card in testing), Reliance Digital (pincode input exists but no reachable
-  "Apply" button was found, and the real stock element rendered as an empty
-  Vue.js placeholder on initial load).
+- **Reliance Digital — verified via internal API, high confidence,
+  location-independent.** The site runs on the Fynd commerce platform, whose
+  storefront API (`/api/service/application/catalog/v1.0/products/<slug>/sizes/`)
+  returns a clean `sellable: true/false` plus live quantity. Auth is the
+  static public Bearer token the site's own frontend sends (embedded in its
+  JS bundle — re-grab from DevTools if it ever rotates); the request-signing
+  header the site also sends is not enforced server-side (verified live
+  2026-07-15). National availability, same caveat class as Sony Center.
+  The earlier dom-strategy blockers (an "Apply" control that's a `<p>` not a
+  button, and a Vue placeholder buy-box) are moot — no page load needed.
+- **Croma — verified via internal API, high confidence,
+  location-independent in practice.** The website itself hard-blocks
+  automation (Akamai edge 403 on every non-headful load — curl, axios, and
+  headless Chromium/Chrome alike; only headful real Chrome passes, and
+  cookies minted there don't transfer back to headless). But the OMS
+  delivery-promise endpoint the product page itself calls
+  (`POST api.croma.com/inventory/oms/v2/tms/details-pwa/`) answers to plain
+  axios with no cookies — just the public `oms-apim-subscription-key` header
+  every visitor's browser sends. In stock ⇒ the response carries an HDEL
+  promise line with a delivery date for the requested pincode; out of stock
+  ⇒ an `unavailableReason` (verified both ways 2026-07-15, cross-checked
+  against the real page's disabled/enabled Add to Cart buttons). Live-tested
+  across 5 pincodes: availability was identical everywhere, only delivery
+  dates differed — so one representative pincode per SKU suffices.
+- **Excluded after live testing, not shipped:** Vijay Sales (a real
+  OOS/in-stock signal exists, but the page interleaves this product with an
+  unrelated "related products" carousel using the same classes — `.first()`
+  picked up the wrong card in testing).
 
 **⚠️ Important: Amazon and Flipkart's "in stock" is not "in stock near you."**
 Neither exposes a scriptable way to check a chosen city/pincode — both
@@ -149,11 +179,15 @@ Gurugram/Hyderabad/Lucknow/Bangalore/Mumbai/Pune here for these retailers —
 running the script from your own city's connection is what actually answers
 "is it available near me," not a scripted pincode picker.
 
-The excluded retailers aren't unfixable — `cookies`/`preActions`/`press`
-exist specifically to support flows like theirs. Picking it up yourself
-means running with `HEADLESS=false` and walking through the real flow in
-DevTools; the notes above give you the exact selectors/endpoints already
-found so you're not starting from zero.
+The excluded retailer isn't unfixable — `cookies`/`preActions`/`press`
+exist specifically to support flows like Vijay Sales'. Picking it up
+yourself means running with `HEADLESS=false` and walking through the real
+flow in DevTools; the notes above give you the exact selectors/endpoints
+already found so you're not starting from zero. (Croma and Reliance Digital
+were recovered exactly this way — their sites resist scraping, but the JSON
+APIs their own pages call turned out to be openly callable. When a `dom`
+target fights back, always check the Network tab for the underlying API
+first.)
 
 ## Quick-commerce platforms (BigBasket, Flipkart Minutes, Blinkit, Instamart, Zepto, ...)
 

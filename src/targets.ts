@@ -24,6 +24,132 @@ const ZEPTO_IN_STOCK_CONFIRMATIONS: InStockConfirmation[] = [
 ];
 
 /**
+ * Builds the JSON body Croma's own PDP sends to its OMS delivery-promise
+ * endpoint (POST api.croma.com/inventory/oms/v2/tms/details-pwa/). The real
+ * page sends three promise lines (home delivery / store pickup / same-day);
+ * a single HDEL home-delivery line was live-verified 2026-07-15 to answer
+ * identically, and keeps the OOS signal unambiguous: with one line, ANY
+ * `unavailableReason` in the response means not orderable, whereas the
+ * 3-line body returns "SOURCING_RULE_NOT_DEFINED" noise on the pickup lines
+ * even for in-stock items.
+ *
+ * Response shapes (both live-verified 2026-07-15):
+ *   in stock  -> promise.suggestedOption.option.promiseLines.promiseLine has
+ *                an entry with fulfillmentType "HDEL" + a delivery-date
+ *                assignment for the requested zipCode (verified against an
+ *                in-stock DualSense controller, itemID 312554)
+ *   out of stock -> promiseLine is [] and an unavailableLine carries
+ *                unavailableReason "NOT_ENOUGH_PRODUCT_CHOICES" (verified
+ *                against both PS5 slim SKUs, which also render disabled
+ *                Add to Cart buttons on the real PDP)
+ */
+function cromaPromiseBody(itemId: string, pincode: string): unknown {
+  return {
+    promise: {
+      allocationRuleID: "SYSTEM",
+      checkInventory: "Y",
+      organizationCode: "CROMA",
+      sourcingClassification: "EC",
+      promiseLines: {
+        promiseLine: [
+          {
+            fulfillmentType: "HDEL",
+            mch: "",
+            itemID: itemId,
+            lineId: "1",
+            categoryType: "nonMobile",
+            reqEndDate: "2500-01-01",
+            reqStartDate: "",
+            requiredQty: "1",
+            shipToAddress: {
+              company: "",
+              country: "",
+              city: "",
+              mobilePhone: "",
+              state: "",
+              zipCode: pincode,
+              extn: { irlAddressLine1: "", irlAddressLine2: "" },
+            },
+            extn: { widerStoreFlag: "N" },
+          },
+        ],
+      },
+    },
+  };
+}
+
+/**
+ * The public subscription key Croma's frontend bundle ships to every
+ * visitor for its OMS inventory API - NOT a user secret. If Croma rotates
+ * it, grab the new one from DevTools -> Network -> the details-pwa request's
+ * `oms-apim-subscription-key` header on any product page.
+ */
+const CROMA_OMS_SUBSCRIPTION_KEY = "1131858141634e2abe2efb2b3a2a2a5d";
+
+/** Builds one Croma target - see cromaPromiseBody for the verified signal. */
+function cromaTarget(opts: { idSuffix: string; label: string; itemId: string; productUrl: string }): Target {
+  return {
+    id: `croma-${opts.idSuffix}`,
+    label: `Croma - ${opts.label}`,
+    url: "https://api.croma.com/inventory/oms/v2/tms/details-pwa/",
+    displayUrl: opts.productUrl,
+    strategy: "api",
+    method: "POST",
+    requestHeaders: {
+      Accept: "application/json, text/plain, */*",
+      "Content-Type": "application/json",
+      "oms-apim-subscription-key": CROMA_OMS_SUBSCRIPTION_KEY,
+      Referer: "https://www.croma.com/",
+      Origin: "https://www.croma.com",
+    },
+    // Delivery inventory is effectively national: live-tested 5 zips across
+    // Bangalore/Cuttack/Patiala/Navi Mumbai/Delhi on an in-stock item - all
+    // serviceable, only the promised delivery date differed. One
+    // representative pincode therefore covers "orderable at all".
+    requestBody: cromaPromiseBody(opts.itemId, "560075"),
+    // suggestedOption contains BOTH the promiseLines (filled when orderable)
+    // and any unavailableLines - so an explicit unavailableReason is checked
+    // first, and the HDEL promise entry is the positive signal. With the
+    // single-line body these are mutually exclusive.
+    jsonPath: "promise.suggestedOption",
+    outOfStockValues: ["unavailablereason"],
+    inStockValues: ["fulfillmenttype"],
+  };
+}
+
+/**
+ * The public Bearer token Reliance Digital's frontend (Fynd platform) ships
+ * to every visitor - base64 of its application id:token pair, NOT a user
+ * secret. If it rotates, grab the new one from DevTools -> Network -> any
+ * /api/service/application/... request's `authorization` header.
+ */
+const RELIANCE_DIGITAL_BEARER = "Bearer NjQ1YTA1Nzg3NWQ4YzQ4ODJiMDk2ZjdlOl9fLU80NC00aQ==";
+
+/** Builds one Reliance Digital target - availability via Fynd's sizes API. */
+function relianceDigitalTarget(opts: { idSuffix: string; label: string; slug: string }): Target {
+  return {
+    id: `reliancedigital-${opts.idSuffix}`,
+    label: `Reliance Digital - ${opts.label}`,
+    url: `https://www.reliancedigital.in/api/service/application/catalog/v1.0/products/${opts.slug}/sizes/`,
+    displayUrl: `https://www.reliancedigital.in/product/${opts.slug}`,
+    strategy: "api",
+    requestHeaders: {
+      Accept: "application/json, text/plain, */*",
+      authorization: RELIANCE_DIGITAL_BEARER,
+      "x-currency-code": "INR",
+    },
+    // `sellable` is a top-level boolean - live-verified 2026-07-15 to read
+    // true (with real quantities) on the three orderable PS5 consoles and
+    // false on the not-orderable bundle listings. Like Sony Center/Flipkart,
+    // this is national availability, not per-pincode - the sizes response
+    // was byte-identical with and without a pincode location header.
+    jsonPath: "sellable",
+    outOfStockValues: ["false"],
+    inStockValues: ["true"],
+  };
+}
+
+/**
  * --- Findings from live testing against each site while building this ---
  *
  * None of India's major PS5 retailers expose a "list stores in city X with
@@ -83,21 +209,34 @@ const ZEPTO_IN_STOCK_CONFIRMATIONS: InStockConfirmation[] = [
  *     is unaffected by this (it's a national sale, not location-gated) and
  *     is fine to run from GitHub Actions.
  *
+ * Croma and Reliance Digital - PREVIOUSLY EXCLUDED, NOW WORKING via their
+ * internal storefront APIs (re-investigated and live-verified 2026-07-15,
+ * after both had stock the previous day that this checker missed):
+ *   - Croma: the website itself is still hard-blocked for automation - the
+ *     Akamai edge 403s every plain page load (curl, axios, AND headless
+ *     Chromium/real-Chrome; only a HEADFUL real Chrome passes, and cookies
+ *     minted there do NOT transfer back to headless). But the availability
+ *     oracle the PDP itself uses - POST api.croma.com/inventory/oms/v2/tms/
+ *     details-pwa/ - accepts plain axios calls with NO cookies at all, just
+ *     the public `oms-apim-subscription-key` header every visitor's browser
+ *     sends. See the Croma targets below for the verified in/out-of-stock
+ *     response shapes.
+ *   - Reliance Digital: runs on the Fynd commerce platform, which exposes
+ *     GET /api/service/application/catalog/v1.0/products/<slug>/sizes/
+ *     returning a clean `sellable: true/false` (plus live quantity). Auth is
+ *     a static public Bearer token from the frontend bundle; the x-fp-
+ *     signature request-signing header the site also sends is NOT enforced
+ *     server-side (verified live). The old dom-strategy blockers (unreachable
+ *     "Apply" control - it's a <p>, not a button - and the empty Vue
+ *     placeholder buy-box) are moot since the API needs no page at all.
+ *
  * Excluded after live testing - not shipped, to avoid pretending confidence
  * that testing disproved:
- *   - Croma: blocked outright, HTTP 403 "Access Denied" on a plain page load.
  *   - Vijay Sales: has a real "Out Of Stock"/"Notify Me" vs "Add to Cart"
  *     signal, but the page interleaves multiple product cards (this item +
  *     a "related products" carousel) using the SAME classes - `.first()` on
  *     either selector returned contradictory results in testing, picking up
  *     an unrelated carousel item rather than the main product reliably.
- *   - Reliance Digital: pincode input exists, but no reachable "Apply"
- *     button was found, and the real add-to-cart/stock button rendered as an
- *     empty Vue.js placeholder on initial load.
- *   All four are architecturally supported (cookies/preActions/press exist
- *   for exactly this) if you want to pick up the investigation yourself with
- *   HEADLESS=false and DevTools - see README.md -> "Retailer confidence"
- *   for the exact anchors already found.
  */
 export const TARGETS: Target[] = [
   {
@@ -137,6 +276,54 @@ export const TARGETS: Target[] = [
     outOfStockValues: ["schema.org/outofstock"],
     inStockValues: ["schema.org/instock"],
   },
+
+  // --- Reliance Digital, added 2026-07-15 after a missed restock the
+  // previous day - "api" strategy against Fynd's public sizes endpoint, see
+  // relianceDigitalTarget/RELIANCE_DIGITAL_BEARER above for the full
+  // findings. At wiring time: slim disc sellable=true qty 9, slim digital
+  // sellable=true qty 6, digital edition sellable=true qty 1 - all three
+  // will therefore show IN_STOCK on the first check cycle. -----------------
+  relianceDigitalTarget({
+    idSuffix: "ps5-slim",
+    label: "PS5 Slim Console (Disc)",
+    slug: "sony-playstation-ps5-slim-console-luh1rv-7537998",
+  }),
+  relianceDigitalTarget({
+    idSuffix: "ps5-slim-digital",
+    label: "PS5 Slim Digital Console",
+    slug: "sony-playstation-ps5-slim-digital-console-luh1rv-7537999",
+  }),
+  relianceDigitalTarget({
+    idSuffix: "ps5-digital-edition",
+    label: "PS5 Digital Edition Console",
+    slug: "sony-playstation-5-digital-edition-console",
+  }),
+
+  // --- Croma, added 2026-07-15 alongside Reliance Digital - "api" strategy
+  // POST against the OMS delivery-promise endpoint the PDP itself uses, see
+  // cromaPromiseBody/cromaTarget above for the verified request/response
+  // contract. The website stays Akamai-blocked for automation; this endpoint
+  // is the one path that answers without cookies. At wiring time all three
+  // SKUs read OUT_OF_STOCK (NOT_ENOUGH_PRODUCT_CHOICES + disabled Add to
+  // Cart buttons on the real PDP, cross-checked headful). ------------------
+  cromaTarget({
+    idSuffix: "ps5-slim-disc-321320",
+    label: "PS5 Slim 1TB Standard Disc",
+    itemId: "321320",
+    productUrl: "https://www.croma.com/sony-playstation-5-1tb-ssd-standard-disc-gaming-console-white-/p/321320",
+  }),
+  cromaTarget({
+    idSuffix: "ps5-slim-digital-316841",
+    label: "PS5 Slim 1TB Digital Edition",
+    itemId: "316841",
+    productUrl: "https://www.croma.com/sony-playstation-5-1tb-ssd-digital-edition-slim-gaming-console-white-/p/316841",
+  }),
+  cromaTarget({
+    idSuffix: "ps5-slim-305985",
+    label: "PS5 Slim 1TB (original listing)",
+    itemId: "305985",
+    productUrl: "https://www.croma.com/sony-playstation-5-slim-1tb-ssd-gaming-console-white-/p/305985",
+  }),
 
   // --- Quick-commerce examples (BigBasket, Flipkart Minutes, Blinkit,
   // Swiggy Instamart, Zepto, ...) -----------------------------------------

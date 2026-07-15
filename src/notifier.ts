@@ -71,17 +71,20 @@ async function postToTelegram(text: string): Promise<void> {
 
 export async function notifyBackInStock(result: StockResult): Promise<void> {
   const { target } = result;
+  // Prefer the human-facing product page over a raw API endpoint - an alert
+  // is for racing to buy, so the link must open something purchasable.
+  const linkUrl = target.displayUrl ?? target.url;
 
   const discordEmbed = {
     title: target.label,
-    url: target.url,
+    url: linkUrl,
     color: 0x2ecc71, // green
     fields: [
       { name: "Status", value: result.status, inline: true },
       { name: "Checked at", value: result.checkedAt, inline: true },
     ],
   };
-  const telegramText = `🚨 *IN STOCK* — ${target.label}\n${target.url}\nChecked at: ${result.checkedAt}`;
+  const telegramText = `🚨 *IN STOCK* — ${target.label}\n${linkUrl}\nChecked at: ${result.checkedAt}`;
 
   await Promise.all([
     postToDiscord(`🚨 **IN STOCK** — ${target.label}`, discordEmbed),
@@ -93,17 +96,18 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
 
 export async function notifyComingSoon(result: StockResult): Promise<void> {
   const { target } = result;
+  const linkUrl = target.displayUrl ?? target.url;
 
   const discordEmbed = {
     title: target.label,
-    url: target.url,
+    url: linkUrl,
     color: 0xf1c40f, // yellow
     fields: [
       { name: "Status", value: result.status, inline: true },
       { name: "Checked at", value: result.checkedAt, inline: true },
     ],
   };
-  const telegramText = `👀 *COMING SOON* — ${target.label}\nOpen the app and check manually.\n${target.url}\nChecked at: ${result.checkedAt}`;
+  const telegramText = `👀 *COMING SOON* — ${target.label}\nOpen the app and check manually.\n${linkUrl}\nChecked at: ${result.checkedAt}`;
 
   await Promise.all([
     postToDiscord(`👀 **COMING SOON** — ${target.label} — open the app and check manually`, discordEmbed),
