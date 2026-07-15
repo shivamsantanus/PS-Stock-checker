@@ -277,6 +277,12 @@ const RELIANCE_DIGITAL_PINCODES: { pincode: string; city: string }[] = [
   // below for all 6 requested pincodes individually.
   { pincode: "411001", city: "Pune" },
   { pincode: "400013", city: "Mumbai" },
+  // Added 2026-07-17 - requested pincode batch (570018/560072/500032/560098/
+  // 560048/560075). 560072, 560075 and 560048 were already covered (560075
+  // above, 560072/560048 via the quick-commerce flatMap list) - only the two
+  // new cities are added here per this list's dedup policy.
+  { pincode: "570018", city: "Mysore" },
+  { pincode: "500032", city: "Hyderabad" },
 ];
 
 /**
@@ -595,6 +601,11 @@ export const TARGETS: Target[] = [
       { pincode: "411001", city: "Pune" },
       { pincode: "411045", city: "Pune" },
       { pincode: "400013", city: "Mumbai" },
+      // Added 2026-07-17 - requested pincode batch. 560072, 560075, and
+      // 560048 already exist above (added 2026-07-08/07-10) - not duplicated.
+      { pincode: "570018", city: "Mysore" },
+      { pincode: "500032", city: "Hyderabad" },
+      { pincode: "560098", city: "Bangalore" },
     ] as { pincode: string; city: string }[]
   ).flatMap(({ pincode, city }): Target[] => [
     {
