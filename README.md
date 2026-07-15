@@ -128,8 +128,21 @@ done while building this — not guesses:
   of stock, an in-stock accessory reading `In Stock`/5 at the same moment).
   National online inventory — their physical stores don't expose per-store
   stock online either.
+  **Pre-order detection, added 2026-07-16:** GTS has a genuine
+  `is_pre_order` boolean + `release_date`, confirmed live against real
+  upcoming-game listings. Crucially, pre-order items still read
+  `stock_status: "In Stock"` — identical to genuine ready-to-ship stock —
+  so `is_pre_order` is checked first and routes to `COMING_SOON` instead of
+  a misleading "in stock, buy now" alert. Dormant for both tracked PS5 SKUs
+  today (`is_pre_order: false`).
 - **Amazon.in — verified selector, medium confidence, location-dependent.**
   `#availability` reliably shows "Currently unavailable." when out of stock.
+  **Pre-order detection, added 2026-07-16:** the same `#availability`
+  selector reads `"This item will be released on <date>. Pre-order now."`
+  for genuine pre-order listings — confirmed live against an active GTA VI
+  PS5 listing, so no new scraping infrastructure was needed. Dormant for the
+  PS5 console itself (already released since 2021) — only matters if Amazon
+  lists a new not-yet-released PS5 SKU/bundle.
 - **Flipkart — verified via structured data, high confidence for "in stock
   somewhere," location-dependent for "deliverable to you."** Every product
   page embeds a `<script type="application/ld+json" id="jsonLD">` block
@@ -166,6 +179,14 @@ done while building this — not guesses:
   read "Source:" in the alert — a mall-store source may be display/reserved
   units that fail at payment; treat every RD alert as "go try immediately,"
   not a guarantee.
+  **Pre-order watch, added 2026-07-16:** re-verified TAT/distance/
+  delivery-promise are still null/absent. Separately found the real catalog
+  product-detail endpoint is v1.0, not v2.0 (v2.0 404s) — its
+  `_custom_json.pre_order_enabled` field is a genuine, currently-live
+  pre-order flag RD's Fynd platform uses for other launches (e.g. new
+  phones). One target per SKU watches this (not fanned per pincode — it's a
+  product attribute, not a deliverability check). Dormant for all 3 PS5
+  SKUs today (`pre_order_enabled: false`).
 - **Croma — verified via internal API, high confidence,
   location-independent in practice.** The website itself hard-blocks
   automation (Akamai edge 403 on every non-headful load — curl, axios, and
@@ -180,6 +201,13 @@ done while building this — not guesses:
   against the real page's disabled/enabled Add to Cart buttons). Live-tested
   across 5 pincodes: availability was identical everywhere, only delivery
   dates differed — so one representative pincode per SKU suffices.
+  **Investigated for pre-order detection, 2026-07-16, not wired:** every
+  in-stock item's promise line carries an undocumented `extn.preOrderItem`
+  string field — the obvious "this is a pre-order" signal — but it read as
+  an empty string on every one of ~20 live products sampled (no active
+  pre-order product currently exists on croma.com to see a populated value
+  against). Left documented but inactive rather than matching against a
+  guessed value — same rule that caught the `sellable` false positive above.
 - **Excluded after live testing, not shipped:** Vijay Sales (a real
   OOS/in-stock signal exists, but the page interleaves this product with an
   unrelated "related products" carousel using the same classes — `.first()`

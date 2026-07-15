@@ -114,6 +114,19 @@ function cromaTarget(opts: { idSuffix: string; label: string; itemId: string; pr
     jsonPath: "promise.suggestedOption",
     outOfStockValues: ["unavailablereason"],
     inStockValues: ["fulfillmenttype"],
+    // NOT wired as a comingSoonValues check (deliberately) - investigated
+    // 2026-07-16: every in-stock item's promiseLine carries an
+    // `extn.preOrderItem` string field (undocumented until now), which
+    // reads as the obvious "this is a pre-order, not real stock" signal.
+    // But across ~20 live products sampled (Galaxy Z Fold7/Flip7, Vivo
+    // X Fold5, tablets, the 3 PS5 SKUs) it was ALWAYS the empty string - no
+    // currently-active pre-order product exists on croma.com to observe a
+    // populated value against, so the real non-empty shape is unknown. Per
+    // this file's own rule (never wire a match against a guessed value -
+    // see the Reliance Digital `sellable` false-positive above), this stays
+    // a documented dormant field, not an active check. If Croma ever runs a
+    // PS5 pre-order window, re-probe `extn.preOrderItem` live first to see
+    // what it actually contains before wiring a comingSoonValues match.
   };
 }
 
@@ -196,6 +209,50 @@ function relianceDigitalTarget(opts: {
 }
 
 /**
+ * Builds one Reliance Digital pre-order watch target - a SEPARATE endpoint
+ * from relianceDigitalTarget above, added 2026-07-16 while investigating
+ * whether RD exposes any "upcoming stock" signal. re-verified live that
+ * tat/distance/delivery_promise (mentioned in the KNOWN LIMIT note above)
+ * are still null/absent, but found the REAL catalog product-detail endpoint
+ * is v1.0, not v2.0 (v2.0 404s) - and that v1.0 body carries a full,
+ * genuine pre-order schema under `_custom_json`:
+ *
+ *   GET /catalog/v1.0/products/<slug>/
+ *     _custom_json.pre_order_enabled -> boolean
+ *     _custom_json.pre_order_launch_date / _start_date / _end_date / etc.
+ *
+ * Live-verified 2026-07-16: `pre_order_enabled: false` (and every date field
+ * null) for all 3 tracked PS5 SKUs - dormant today, but a real, currently
+ * live field RD's own Fynd platform uses elsewhere for genuine pre-order
+ * campaigns (e.g. new phone launches). This is a per-SKU product attribute,
+ * NOT pincode-dependent (unlike deliverability), so ONE target per SKU is
+ * enough - no need to fan this out across RELIANCE_DIGITAL_PINCODES like
+ * relianceDigitalTarget above.
+ *
+ * inStockValues is deliberately empty: this target exists ONLY to watch for
+ * a pre-order window opening, not to duplicate the per-pincode
+ * deliverability check above - so it can only ever read COMING_SOON or
+ * (by default) OUT_OF_STOCK, never a false "back in stock" alert.
+ */
+function relianceDigitalPreOrderTarget(opts: { idSuffix: string; label: string; slug: string }): Target {
+  return {
+    id: `reliancedigital-preorder-${opts.idSuffix}`,
+    label: `Reliance Digital - ${opts.label} (pre-order watch)`,
+    url: `https://www.reliancedigital.in/api/service/application/catalog/v1.0/products/${opts.slug}/`,
+    displayUrl: `https://www.reliancedigital.in/product/${opts.slug}`,
+    strategy: "api",
+    requestHeaders: {
+      Accept: "application/json, text/plain, */*",
+      authorization: RELIANCE_DIGITAL_BEARER,
+      "x-currency-code": "INR",
+    },
+    jsonPath: "_custom_json",
+    comingSoonValues: ['"pre_order_enabled":true'],
+    inStockValues: [],
+  };
+}
+
+/**
  * Builds one Games The Shop target - the online store of India's
  * PlayStation-exclusive retail chain (run by E-xpress Interactive, Sony's
  * official PlayStation distributor in India), investigated 2026-07-15 when
@@ -216,6 +273,20 @@ function relianceDigitalTarget(opts: {
  * per-store stock online), so a single location-independent target per SKU
  * is the correct shape. detailJsonPath surfaces the live unit count in the
  * alert so the reader knows how hard to race (5 units left vs 100).
+ *
+ * PRE-ORDER DETECTION, added 2026-07-16: GTS has a genuine `is_pre_order`
+ * boolean (paired with a `release_date`), live-verified against real
+ * upcoming-game listings ("The Blood of Dawnwalker", "Marvel Tokon:
+ * Fighting Souls" - both `is_pre_order: true` with a future release_date).
+ * Critically, GTS reports `stock_status: "In Stock"` for those pre-order
+ * items too - identical to genuine ready-to-ship stock - so `stock_status`
+ * ALONE cannot tell "buy it now" apart from "pay now, ships on launch day".
+ * jsonPath is therefore the whole `data` object (not just `stock_status`),
+ * with `comingSoonValues` matching `is_pre_order:true` and checked first
+ * (see resolveStatus in scraper.ts) so a future pre-order PS5 SKU routes to
+ * COMING_SOON instead of firing a misleading "IN STOCK, buy now" alert.
+ * Currently dormant for both tracked SKUs (`is_pre_order: false`, an old
+ * `release_date` in the past) - only matters if GTS pre-lists a new PS5 SKU.
  *
  * SONY PHYSICAL STORES - INVESTIGATED, NOT POSSIBLE (2026-07-15): the user
  * asked whether the ~100 Sony Center / Sony Exclusive stores across India
@@ -243,7 +314,11 @@ function gamesTheShopTarget(opts: { idSuffix: string; label: string; productId: 
     displayUrl: `https://www.gamestheshop.com/product/${opts.productId}`,
     strategy: "api",
     requestHeaders: { Accept: "application/json" },
-    jsonPath: "data.stock_status",
+    // Whole "data" object, not just "data.stock_status" - see the pre-order
+    // note in the factory doc comment above for why is_pre_order must be
+    // checked too.
+    jsonPath: "data",
+    comingSoonValues: ['"is_pre_order":true'],
     // "Out of Stock" is checked before inStockValues, so the substring
     // overlap with "In Stock" is safe (same pattern as every target here).
     outOfStockValues: ["out of stock"],
@@ -283,6 +358,7 @@ const RELIANCE_DIGITAL_PINCODES: { pincode: string; city: string }[] = [
   // new cities are added here per this list's dedup policy.
   { pincode: "570018", city: "Mysore" },
   { pincode: "500032", city: "Hyderabad" },
+  { pincode: "201002", city: "Ghaziabad" },
 ];
 
 /**
@@ -419,6 +495,14 @@ export const TARGETS: Target[] = [
     url: "https://www.amazon.in/Sony-CFI-1008A01R-PlayStation-5-console/dp/B08FV5GC28",
     strategy: "dom",
     selector: "#availability",
+    // Live-verified 2026-07-16 against a real active pre-order listing (GTA
+    // VI, same #availability selector): a not-yet-released item reads
+    // "This item will be released on <date>.\nPre-order now." - same
+    // selector already scraped here, so this is free to check even though
+    // it's dormant for the PS5 console itself (already released since 2021,
+    // so #availability will essentially never say this for THIS listing -
+    // only useful if Amazon lists a new not-yet-released PS5 SKU/bundle).
+    comingSoonValues: ["will be released on", "pre-order now"],
     outOfStockValues: ["currently unavailable", "out of stock"],
     inStockValues: ["in stock", "few left", "hurry"],
   },
@@ -462,6 +546,27 @@ export const TARGETS: Target[] = [
       city,
     }),
   ]),
+
+  // --- Reliance Digital pre-order watch, added 2026-07-16 - see the
+  // relianceDigitalPreOrderTarget factory above for the verified
+  // `_custom_json.pre_order_enabled` contract. One target per SKU (not
+  // fanned out per pincode - pre-order eligibility isn't pincode-dependent).
+  // All 3 read `pre_order_enabled: false` at wiring time. -------------------
+  relianceDigitalPreOrderTarget({
+    idSuffix: "ps5-slim",
+    label: "PS5 Slim Console (Disc)",
+    slug: "sony-playstation-ps5-slim-console-luh1rv-7537998",
+  }),
+  relianceDigitalPreOrderTarget({
+    idSuffix: "ps5-slim-digital",
+    label: "PS5 Slim Digital Console",
+    slug: "sony-playstation-ps5-slim-digital-console-luh1rv-7537999",
+  }),
+  relianceDigitalPreOrderTarget({
+    idSuffix: "ps5-digital-edition",
+    label: "PS5 Digital Edition Console",
+    slug: "sony-playstation-5-digital-edition-console",
+  }),
 
   // --- Croma, added 2026-07-15 alongside Reliance Digital - "api" strategy
   // POST against the OMS delivery-promise endpoint the PDP itself uses, see
@@ -606,6 +711,7 @@ export const TARGETS: Target[] = [
       { pincode: "570018", city: "Mysore" },
       { pincode: "500032", city: "Hyderabad" },
       { pincode: "560098", city: "Bangalore" },
+      { pincode: "201002", city: "Ghaziabad" },
     ] as { pincode: string; city: string }[]
   ).flatMap(({ pincode, city }): Target[] => [
     {

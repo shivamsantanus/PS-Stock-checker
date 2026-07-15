@@ -1,0 +1,583 @@
+{
+  "cookies": [
+    {
+      "name": "AKA_A2",
+      "value": "A",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1784142921.587408,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "bm_sz",
+      "value": "8F4537955BC00094E877E4A3A1A06BC0~YAAQlHUsMUZMWWSfAQAAuZD9ZgDZ0zLx4sH+wOUE6vS/U8YHRhFdCgFFxErlmTVhLOfb+5nrrVdfOcVjI1Uca77tlm+aeaeW78oIKQVWjLXto9ecu3qQoJnubYGCHQJLmugEJZ51aOXCk1Y+ZXTukNTREYa16vrUtKwLqf27cJRXi4uiHaa1KeFYQH1S/WhwjrfUdbnZL8x84F41uuv3wiDGXB6PgagcLfvh3956PHkx2WTga7O11DONyJxRv4c76xHjN+SZJNmDJ7md09QWbSqlCgHR5UiVtjt8Qpkxl9HFBS1sZRS/HSztfOrYfaXYvT6uruqUt7KsgPutUyE08W6lG7RwLULcB7T7PEZJqKy1J4WqTT4r2zpWLg7/xT/DsZv/OZZtz7SfH8/MNw6eDK75iMhibcBJ1vVVyGOvYdCmrZiT~3488057~4277808",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1784153721.587586,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "at_check",
+      "value": "true",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "s_plt",
+      "value": "0.52",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "s_pltp",
+      "value": "undefined",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "demdex",
+      "value": "47176436774642837023675882257307497604",
+      "domain": ".demdex.net",
+      "path": "/",
+      "expires": 1799691322.667832,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "AMCVS_E78F53F05EFEF21E0A495E58%40AdobeOrg",
+      "value": "1",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_abck",
+      "value": "4920AC2E4C30025835087F7406B11051~-1~YAAQlHUsMVFNWWSfAQAADJL9ZhAuxeA3Ddnb736tDuCuFs7nv07L6vxjW8HS84wI3eRGJGgLgMt+B8ArjMAYFxiFuTZWdq3XIR+p5v0YswOM1Yf79MdAGCxYvuoSkRmpA/Te5dQe4wUIwOc71hp+/Dn1k3VPjA7L32mgDjnQOjYN+B4FNJEWiYDZTUmAsIkpgsk2Mf11EwnTMjCJXcCzWOiTNrmBR/yJGiXrymenwvFJlw+VXbowi+C7lt4+/Gy1saHiD6c3Kg77ZRGO+9AHKitnKJB6MWowddqyCzV0uAJhyHdPU6vgiROuYLgLKR5vsuIRk79uOlgqVHp+D8Pfs9FSnsctCcseQq0PfWkjdCdTbkPlM332019JFs1UQJMKX6yi8aChHpRixO+1iJPrvt7J4cC3X35DkgqdKUaDjniGLIlv3Bwr9dfz9xpfK2RZJKyJ/D5SE6UkEggiEr2/WIeqLgXxkx4D3PF41jX6ugyYA0WTuILPee8yOunvNHnw3pXBe7xE4JLglFNyWjDbAK5aB9L9Xfg71yMgtCufhWo=~-1~-1~-1~AAQAAAAG%2f%2f%2f%2f%2f7PRW32JQ0aU2Z+8hFh%2f2ftxtG9Ak79rJwp92kh0tGtTo4TL68YfRcSruFlCbn1rEBSC45HS1IeUuO7N5tZUlecM0bz8bSD3%2fZCm~-1",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1815675322.03988,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "s_ecid",
+      "value": "MCMID%7C54047364046161249264141710346792281932",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1818699322.584715,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "mbox",
+      "value": "session#f85ca4b77202466c91454ef8fa8d59a7#1784141183|PC#f85ca4b77202466c91454ef8fa8d59a7.41_0#1847384123",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1818699322.47508,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "s_ips",
+      "value": "720",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "s_cc",
+      "value": "true",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "s_nr30",
+      "value": "1784139322472-New",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1786731322,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "s_stop5",
+      "value": "0",
+      "domain": "www.croma.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "jarvis-id",
+      "value": "264e41e8-f7d9-4c6b-8ae3-d88a657f6634",
+      "domain": "www.croma.com",
+      "path": "/",
+      "expires": 1818699322.502702,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "everest_g_v2",
+      "value": "g_surferid~alfOOgAAABhFRgOa",
+      "domain": ".everesttech.net",
+      "path": "/",
+      "expires": 1815675322.594185,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_gcl_au",
+      "value": "1.1.1338629217.1784139323",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1791915323,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "dpm",
+      "value": "47176436774642837023675882257307497604",
+      "domain": ".dpm.demdex.net",
+      "path": "/",
+      "expires": 1799691322.667904,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "AMCV_E78F53F05EFEF21E0A495E58%40AdobeOrg",
+      "value": "179643557%7CMCIDTS%7C20650%7CMCMID%7C54047364046161249264141710346792281932%7CMCAAMLH-1784744122%7C12%7CMCAAMB-1784744122%7C6G1ynYcLPuiQxYZrsz_pkqfLG9yMXBpb2zX5dvJdYQJzPXImdj0y%7CMCOPTOUT-1784146522s%7CNONE%7CMCAID%7CNONE%7CMCSYNCSOP%7C411-20657%7CvVersion%7C5.5.0",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1818699322.692479,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_ga",
+      "value": "GA1.1.2121829230.1784139323",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1818699323.274349,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "WZRK_S_679-6RK-976Z",
+      "value": "%7B%22p%22%3A1%7D",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1784140523,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_hjSessionUser_3400595",
+      "value": "eyJpZCI6IjQyYjM2OWNlLWYzNTAtNTYxZS04NjQ0LTgxYzRmNTcwOTkzNyIsImNyZWF0ZWQiOjE3ODQxMzkzMjM0NjUsImV4aXN0aW5nIjpmYWxzZX0=",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1815675323,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_hjSession_3400595",
+      "value": "eyJpZCI6ImUyZmE3N2VmLWJlNWItNDI1NS1iNmViLWNkZmYzZjNiNjYxNyIsImMiOjE3ODQxMzkzMjM0NjYsInMiOjAsInIiOjAsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjoxLCJzcCI6MH0=",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1784141123,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_fbp",
+      "value": "fb.1.1784139323683.264014813298007580",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1791915323,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "uid",
+      "value": "4ca47dae-afc1-4e5c-9610-b360f2b7eea7",
+      "domain": ".criteo.com",
+      "path": "/",
+      "expires": 1817835324.086652,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_uetsid",
+      "value": "25f1e4e0807911f18b92938ca484e13a",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1784225724,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_uetvid",
+      "value": "25f20360807911f19d865b2089ce936d",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1817835324,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "MUID",
+      "value": "2B8D05E794646A4732AE127095CC6BA6",
+      "domain": ".bing.com",
+      "path": "/",
+      "expires": 1817835325.318943,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "MR",
+      "value": "0",
+      "domain": ".bat.bing.com",
+      "path": "/",
+      "expires": 1784744124.273922,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "cto_bundle",
+      "value": "AduOtF9HSlFJWmF4WWJEVG9ETzRXaFI1a0dmeWpwMkMwWW1Od2pabDJaWTRRTmVUOEtac3UzYXdubFczelA4b2xmcDU4ck10eDU4RG1mZmdZVjltbW9DOEhUTGdDQmVWVXhYbkk2JTJCWGhYODVjaXV2S0ZYYVdXN1JJNHNYem9abnJLVTFJa20lMkI4NjRSZVRJMGs4OVVrUnI2WXlnJTNEJTNE",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1818303324,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "IDE",
+      "value": "AHWqTUlnW8uz-P5DvqfuoxPaztTJ5t0NfSIk0KMxceioyBkNUCsASTeUHgwjDJIOsK4",
+      "domain": ".doubleclick.net",
+      "path": "/",
+      "expires": 1818699324.585138,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "s_tp",
+      "value": "3949",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "s_ppv",
+      "value": "homepage%2C18%2C18%2C720%2C1%2C5",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "RT",
+      "value": "\"z=1&dm=www.croma.com&si=4b0b1482-8614-4dfc-9c77-db4a5240af6e&ss=mrmehivq&sl=1&tt=2mk&rl=1&ld=2mn\"",
+      "domain": ".www.croma.com",
+      "path": "/",
+      "expires": 1784744124,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_ga_DJ3RGVFHJN",
+      "value": "GS2.1.s1784139323$o1$g0$t1784139324$j59$l0$h0",
+      "domain": ".croma.com",
+      "path": "/",
+      "expires": 1818699324.735006,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "MR",
+      "value": "0",
+      "domain": ".c.bing.com",
+      "path": "/",
+      "expires": 1784744125.31912,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "XANDR_PANID",
+      "value": "OIb2pXJIK8w9Fb0w9t9WXYuyNMnjQIGH3OWYnHDPQzNjS4gt5NJD8FyqEuumQ-Ez9OSaZfohZlGLTS52dzz6oPepUpQaASXyFWD-gjV1_nM.",
+      "domain": ".adnxs.com",
+      "path": "/",
+      "expires": 1791915325.669814,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None",
+      "partitionKey": "https://croma.com",
+      "_crHasCrossSiteAncestor": true
+    },
+    {
+      "name": "uuid2",
+      "value": "5080391035581197874",
+      "domain": ".adnxs.com",
+      "path": "/",
+      "expires": 1791915325.670158,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "cto_bundle",
+      "value": "ZjVMdl9PeVl4Nk9Jd0pnUVlSQnd6NzJ6Ynd6WUdqNmg5dTY0VFJwSmFFMkgwZGJTdXE0SHFUZzY1emZLT2glMkJSVVNacFBnYXhYbXFCb3ZkZ00lMkZOdDFUJTJCVGZIN0dlMVJFdkl3UHJYU3g3QzJDZ09TV01IckRtTElMeiUyRmg4WmxWd0ozeFNFT1FTRjRuamJBSjhoVCUyRmxncDUlMkZWb1ElM0QlM0Q",
+      "domain": ".criteo.com",
+      "path": "/",
+      "expires": 1817835326.586543,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None",
+      "partitionKey": "https://croma.com",
+      "_crHasCrossSiteAncestor": true
+    },
+    {
+      "name": "anj",
+      "value": "dTM7k!M4/rCxrEQF']wIg2Ilhf4jGd!]tbPl@/D!9hy6]/CwiQj)91^bxtSX69X2f6%`@:4hZ0R7NN[5i7-8_f6?zT7#wa6?12odvo8va*bpRz*qF1`*bbD:+Rg##",
+      "domain": ".adnxs.com",
+      "path": "/",
+      "expires": 1791915325.670097,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "t_gid",
+      "value": "rtbh-a13bc7e4-6860-45d1-8631-59af536762a1-tuct115153bd",
+      "domain": ".taboola.com",
+      "path": "/",
+      "expires": 1815675325.728963,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "t_pt_gid",
+      "value": "rtbh-a13bc7e4-6860-45d1-8631-59af536762a1-tuct115153bd",
+      "domain": ".taboola.com",
+      "path": "/",
+      "expires": 1815675325.729143,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None",
+      "partitionKey": "https://croma.com",
+      "_crHasCrossSiteAncestor": true
+    },
+    {
+      "name": "localStoragePincode",
+      "value": "\"400049\"",
+      "domain": "www.croma.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://www.croma.com",
+      "localStorage": [
+        {
+          "name": "tdl-sso-version",
+          "value": "4.1.17"
+        },
+        {
+          "name": "bmint_e",
+          "value": "plW/8a+/bAEMDg+TGomHGrILjJO3XJpVSWZm+YykJKNhmVrLqc3sacjqQOSNZPBH2dAmpraTNYMgFwbVWGPq+evo/lq6tpzeleA/uVKxApWXsfuP8oujM/cKB8uCJlhbl6ixNkWQP94foPsGv/bKIprVut5t4pgGg18WuKjXfvCbMwfYH5MZ9SMkHSD7EgEJAz"
+        },
+        {
+          "name": "_uetvid_exp",
+          "value": "Mon, 09 Aug 2027 18:15:24 GMT"
+        },
+        {
+          "name": "cto_bundle",
+          "value": "AduOtF9HSlFJWmF4WWJEVG9ETzRXaFI1a0dmeWpwMkMwWW1Od2pabDJaWTRRTmVUOEtac3UzYXdubFczelA4b2xmcDU4ck10eDU4RG1mZmdZVjltbW9DOEhUTGdDQmVWVXhYbkk2JTJCWGhYODVjaXV2S0ZYYVdXN1JJNHNYem9abnJLVTFJa20lMkI4NjRSZVRJMGs4OVVrUnI2WXlnJTNEJTNE"
+        },
+        {
+          "name": "bmint_k",
+          "value": "3355188~4404036"
+        },
+        {
+          "name": "tgt:tlm:0",
+          "value": "{\"execution\":425.6,\"parsing\":0,\"request\":{\"dns\":138.4,\"tls\":90.1,\"timeToFirstByte\":56.2,\"download\":0.6,\"responseSize\":305},\"telemetryServerToken\":\"13OD8mmKQLOFlv9DVqEli8xPNZRwaU8ROThlnhRO5GA=\",\"mode\":\"edge\",\"features\":{\"executePageLoad\":true,\"prefetchViewCount\":1,\"decisioningMethod\":\"server-side\"},\"requestId\":\"14916b531183491eb9d8d488eef90498\",\"timestamp\":1784139322458}"
+        },
+        {
+          "name": "_gcl_ls",
+          "value": "{\"schema\":\"gcl\",\"version\":1,\"gsid_dc\":{\"value\":{\"joinId\":\"FzEgFdxa7StyoQCgQmBlbr40-h8I6gWESg\",\"lastJoinedTimeMs\":1784139322642},\"expires\":1784139622642},\"gcl_ctr\":{\"value\":{\"value\":4,\"timeouts\":0,\"errors\":0,\"eopCount\":0,\"creationTimeMs\":1784139324107},\"expires\":1791915324107}}"
+        },
+        {
+          "name": "tdl-sso-analytics-v2",
+          "value": "{\"_id\":\"646daac343680a50726914ab\",\"urls\":[\"reqbin\",\"transaction\",\"orderConfirmation\",\"order-confirmation\",\"potential-order\"],\"bufferArrayLength\":0,\"bufferIntervalInSeconds\":5,\"bufferSizeInKb\":0,\"dataPublishEndpoint\":\"https://api.tatadigital.com/analytics-engine/events/v1\",\"sessionIdExpiresInS\":86400,\"redirectedFromTCPFlagExpiresInS\":86400,\"redisTtlInSeconds\":2592000,\"createdAt\":\"2023-05-11T08:21:54.108Z\",\"updatedAt\":\"2023-05-11T08:21:54.108Z\",\"__v\":0,\"customerHashValidityInS\":86400,\"keyToCheckLoginState\":[],\"eventToSendConfig\":[],\"recordAnalytics\":true,\"syncTrackingUrls\":[\"/paymentconfirmation\",\"/ocs/v1/order-confirmation\",\"/order/oms/v2/list/details-pwa\",\"/useraccount/allchannels/v1\",\"/floatingcart\",\"/attachProduct\",\"/detail\",\"/addition\",\"/deletion\",\"/inventory/oms/v2/tms/details-pwa/\",\"/inventory/oms/v2/details-pwa/\",\"/price\",\"/user/allchannels/v1\"],\"cartAndWishListConfig\":{\"detail?isGetCart\":{\"products\":[\"entries\"],\"type\":\"cart\",\"keysToCapture\":{\"price\":[\"product\",\"price\",\"value\"],\"productId\":[\"product\",\"code\"],\"productName\":[\"product\",\"name\"],\"quantity\":[\"quantity\"]}}},\"recordGtmEvents\":true,\"dataLayerArgumentEventsToRecord\":[],\"dataLayerObjectEventsToRecord\":[\"add_to_wishlist\",\"add_to_cart\",\"remove_from_cart\",\"begin_checkout\",\"purchase\",\"view_item\",\"add_payment_info\"],\"modifyHistoryOwnMethods\":true,\"recordWebVitals\":false,\"brand\":\"CROMA\",\"browserEventsToRecord\":[\"click\"],\"listenToPastDataLayerEvents\":true,\"recordJsDispatchedClicks\":false,\"clientId\":\"CROMA-WEB-APP\",\"recordNonNeuLed\":true}"
+        },
+        {
+          "name": "WZRK_EV",
+          "value": "%7B%22wzrk_fetch%22%3A%5B1%2C1784139323%2C1784139323%5D%7D"
+        },
+        {
+          "name": "WZRK_ACCOUNT_ID",
+          "value": "%22679-6RK-976Z%22"
+        },
+        {
+          "name": "_uetvid",
+          "value": "25f20360807911f19d865b2089ce936d"
+        },
+        {
+          "name": "lastExternalReferrer",
+          "value": "empty"
+        },
+        {
+          "name": "madUuid",
+          "value": "UaQ2HfduJVjUse6Q"
+        },
+        {
+          "name": "bmint_t",
+          "value": "1784139322~14400"
+        },
+        {
+          "name": "cityName",
+          "value": "Mumbai"
+        },
+        {
+          "name": "anonymousId",
+          "value": "b2767e13-634d-4221-ae40-541b2a154562"
+        },
+        {
+          "name": "WZRK_L",
+          "value": "%7B%221%22%3A%7B%22q%22%3A%22https%3A%2F%2Fin1.clevertap-prod.com%2Fa%3Ft%3D96%26type%3Dpush%26d%3DN4IgLgngDgpiBcIoCcD2AzAlgGzgGiTS1wVAGMwB9VKMVAVzAXQENsBnGAXwMwBMEIAGwB2AJwBaIQCUA0hLEihALRAEoAcwQBGAi3SkQ2TACNBAdxgmJ7PgGsJANwBMAOhGuALGsKo6ZVGxBAAswMCh2EC4uIAA%26optOut%3Dfalse%26rn%3D1%26i%3D1784139323%26sn%3D0%22%7D%2C%222%22%3A%7B%22q%22%3A%22https%3A%2F%2Fin1.clevertap-prod.com%2Fa%3Ft%3D96%26type%3Dpage%26d%3DN4IglgJiBcIGwHYCcBaOAlA0ipC4C0QAaEABwHMYBGEgQwDMZQAbMAIxhAHcBTNlAM4QA1igBuAJgB0CKQBZiZAE4B7AC4qAxiuacAFmrWkBIAL4lNFfYePQA9Ha5Opm1QFtaLlW7uKA6vhYAPoAwgCCALIACkzcYG6kMAAMJFxgasyaMADaALqpAlnQKdz0RcDm3FpMlVwAdhCFyakNZTUtENXQFaamQAA%253D%26rn%3D2%26i%3D1784139323%26sn%3D0%22%7D%2C%223%22%3A%7B%22q%22%3A%22https%3A%2F%2Fin1.clevertap-prod.com%2Fa%3Ft%3D96%26type%3Dpush%26d%3DN4IgLgngDgpiBcIYDcYDswgDROWAcgIYC2ciA7gF4BOA1gPoBmMYAxgBba5gAihYhBKEzwALAF8cASwAmCEADYA7AE4AtAoBKAaTUqlCgFpcoAcwQBGHIUZCQAGykAjeeRhO1AZxm01yAEwAdEqBoibUAPZgEawR9vLsYGBQniCSIADqhjr0AMIAggCyAAp25FLEUAgADDjlYPasCADaALp1nk3wtSDkjF3A6eQxQkNoMp01deP9o9MyI%252FCD4uJAAAA%253D%26rn%3D3%26i%3D1784139323%26sn%3D0%22%7D%7D"
+        },
+        {
+          "name": "tdl-sso-redirect-tcp-flag",
+          "value": "{\"isRedirectedFromTCP\":false,\"setAt\":1784139324703}"
+        },
+        {
+          "name": "3hrPincode",
+          "value": "\"400049\""
+        },
+        {
+          "name": "tgt:tlm:upper",
+          "value": "0"
+        },
+        {
+          "name": "ADRUM_CLIENTINFO",
+          "value": "{\"seqId\":27,\"clientId\":\"7aa8ba56_8c7e_5656_2fde_0a5ee6d5557f\",\"agentId\":\"7aa8ba56_8c7e_5656_2fde_0a5ee6d5557f\"}"
+        },
+        {
+          "name": "urlPath",
+          "value": "{\"currentPath\":\"/\",\"prevPath\":\"\"}"
+        },
+        {
+          "name": "WZRK_TV_CONTROLS",
+          "value": "false"
+        },
+        {
+          "name": "_uetsid",
+          "value": "25f1e4e0807911f18b92938ca484e13a"
+        },
+        {
+          "name": "ADRUM_AGENT_INFO",
+          "value": "{\"ver\":\"23.10.1.4359\",\"id\":\"7aa8ba56_8c7e_5656_2fde_0a5ee6d5557f\"}"
+        },
+        {
+          "name": "bmint_j",
+          "value": "AAQAAAAG%2f%2f%2f%2f%2f7q1U1zUwYfvsj+x6064WbXsJqCAE6a0xxrZMWux2HG0ZXAxJx+fGiwoZjitdkiv+V30z0iXuW1MY74ACOVsStZxqArGAVhiYq3N"
+        },
+        {
+          "name": "WZRK_META",
+          "value": "%7B%22useIP%22%3Atrue%7D"
+        },
+        {
+          "name": "tdl-sso-user-id",
+          "value": "b2767e13-634d-4221-ae40-541b2a154562"
+        },
+        {
+          "name": "tdl-sso-session-id",
+          "value": "{\"sessionId\":\"13d653d7-7340-4619-a656-ef09d5c43098\",\"setAt\":1784139324703}"
+        },
+        {
+          "name": "lastExternalReferrerTime",
+          "value": "1784139323669"
+        },
+        {
+          "name": "WZRK_BLOCK",
+          "value": "true"
+        },
+        {
+          "name": "_uetsid_exp",
+          "value": "Thu, 16 Jul 2026 18:15:24 GMT"
+        },
+        {
+          "name": "URL",
+          "value": "www.croma.com/"
+        },
+        {
+          "name": "tneu.deviceInfo",
+          "value": "{\"platform\":\"web\",\"deviceVersion\":\"0\"}"
+        }
+      ]
+    }
+  ]
+}
