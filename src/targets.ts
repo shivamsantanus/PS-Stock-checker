@@ -196,6 +196,65 @@ function relianceDigitalTarget(opts: {
 }
 
 /**
+ * Builds one Games The Shop target - the online store of India's
+ * PlayStation-exclusive retail chain (run by E-xpress Interactive, Sony's
+ * official PlayStation distributor in India), investigated 2026-07-15 when
+ * the user asked about "PS exclusive stores".
+ *
+ * The site is a custom Next.js storefront backed by an open JSON API at
+ * green-api.gamestheshop.com - live-verified 2026-07-15 to answer a
+ * completely bare GET (no cookies, no token, not even an Origin header):
+ *
+ *   GET /storefront/products/<product_id>
+ *     data.stock_status    -> "In Stock" | "Out of Stock" (product level)
+ *     data.total_inventory -> live unit count (e.g. 5), 0 when out of stock
+ *
+ * Verified both ways the same day: both PS5 Slim consoles read
+ * "Out of Stock"/0 while an in-stock accessory (Logitech G29, itemID
+ * d5715b3a-...) read "In Stock"/5 at the same moment. Like Sony Center this
+ * is one national online inventory pool (their physical stores don't expose
+ * per-store stock online), so a single location-independent target per SKU
+ * is the correct shape. detailJsonPath surfaces the live unit count in the
+ * alert so the reader knows how hard to race (5 units left vs 100).
+ *
+ * SONY PHYSICAL STORES - INVESTIGATED, NOT POSSIBLE (2026-07-15): the user
+ * asked whether the ~100 Sony Center / Sony Exclusive stores across India
+ * can be stock-checked. Findings, so nobody re-does this dead end:
+ *   - shopatsc.com (Sony Center online, already a target above) has NO
+ *     in-store pickup: Shopify's per-location pickup-availability endpoint
+ *     (/variants/<id>/?section_id=pickup-availability) returns 404, so
+ *     Shopify never exposes per-store inventory for it.
+ *   - The "Find Store" page is driven by POST
+ *     shopatsonycenter.com/api/get-sony-center - live-called: it returns a
+ *     directory of 113 franchise stores (101 "Sony Center" + 12 "Sony
+ *     Exclusive": name/address/phone/email/lat-long/timings) with ZERO
+ *     inventory fields. It's a phonebook, not a stock system - useful only
+ *     for finding a store to CALL when an online alert fires.
+ *   - No PlayStation-branded store chain with online per-store stock exists
+ *     in India; Games The Shop (below) is the closest thing - the official
+ *     distributor's own PS-focused chain - and only its ONLINE stock is
+ *     visible.
+ */
+function gamesTheShopTarget(opts: { idSuffix: string; label: string; productId: string }): Target {
+  return {
+    id: `gamestheshop-${opts.idSuffix}`,
+    label: `Games The Shop - ${opts.label}`,
+    url: `https://green-api.gamestheshop.com/storefront/products/${opts.productId}`,
+    displayUrl: `https://www.gamestheshop.com/product/${opts.productId}`,
+    strategy: "api",
+    requestHeaders: { Accept: "application/json" },
+    jsonPath: "data.stock_status",
+    // "Out of Stock" is checked before inStockValues, so the substring
+    // overlap with "In Stock" is safe (same pattern as every target here).
+    outOfStockValues: ["out of stock"],
+    inStockValues: ["in stock"],
+    // Live unit count in the alert - see the factory doc comment.
+    detailJsonPath: "data.total_inventory",
+    detailLabel: "Units in stock",
+  };
+}
+
+/**
  * One representative pincode per priority city (nearby pincodes in the
  * flatMap list resolve to the same regional store, so checking all of them
  * would just repeat the same answer 3x per SKU).
@@ -328,6 +387,23 @@ export const TARGETS: Target[] = [
     jsonPath: "available",
     inStockValues: ["true"],
   },
+
+  // --- Games The Shop, added 2026-07-15 - the PlayStation-exclusive retail
+  // chain run by Sony's official Indian distributor. National online stock
+  // via an open JSON API; see the gamesTheShopTarget factory above for the
+  // verified contract and for why the physical Sony Center stores the user
+  // asked about can NOT be stock-checked (directory API only, no inventory).
+  // Both SKUs read "Out of Stock"/0 units at wiring time. ------------------
+  gamesTheShopTarget({
+    idSuffix: "ps5-slim-disc",
+    label: "PS5 Slim Console - Disc Edition",
+    productId: "1fe01712-6e2b-49b0-9f93-f9670b4ec2a8",
+  }),
+  gamesTheShopTarget({
+    idSuffix: "ps5-slim-digital",
+    label: "PS5 Slim Console - Digital Edition",
+    productId: "0a3c6810-ed3d-4bec-8e98-48a2ed5208fd",
+  }),
   {
     id: "amazon-national",
     // IMPORTANT: "national" here means "wherever this script's network

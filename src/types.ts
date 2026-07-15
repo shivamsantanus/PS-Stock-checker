@@ -88,6 +88,12 @@ export interface Target {
   // Digital's fulfilling store, since a mall-store-sourced offer can still
   // be rejected as phantom inventory at payment time.
   detailJsonPath?: string;
+  // Optional label for the detailJsonPath line in notifications (defaults to
+  // "Source"). Use when the extracted detail isn't a store/origin - e.g.
+  // Games The Shop exposes a live unit count, where "Source: 5" would read
+  // as nonsense but "Units in stock: 5" is exactly what a buyer racing a
+  // restock wants to know.
+  detailLabel?: string;
   // Values (case-insensitive substring match) that count as "in stock" for this target.
   inStockValues: string[];
   // Optional: values that count as "out of stock", checked BEFORE inStockValues.

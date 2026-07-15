@@ -109,6 +109,25 @@ done while building this — not guesses:
   actually buy it. Sony doesn't sell PS5 hardware through its own sony.co.in
   store in India — this is the closest thing to an official first-party
   channel. Covers both the Standard and Digital Edition console SKUs.
+  **Physical Sony Center / Sony Exclusive stores (~113 across India) cannot
+  be stock-checked** — investigated 2026-07-15: shopatsc has no in-store
+  pickup (so Shopify exposes no per-location inventory), and the site's own
+  "Find Store" API (`shopatsonycenter.com/api/get-sony-center`) returns a
+  pure directory (name/address/phone/coordinates) with zero inventory
+  fields. When an online alert fires, that directory is still handy for
+  finding a nearby store to phone.
+- **Games The Shop (gamestheshop.com) — verified via internal API, high
+  confidence, location-independent.** The PlayStation-exclusive retail chain
+  of E-xpress Interactive, Sony's official PlayStation distributor in India.
+  Custom Next.js storefront backed by an open JSON API
+  (`green-api.gamestheshop.com/storefront/products/<id>`) that answers a
+  completely bare GET — no cookies, no tokens. `data.stock_status` reads
+  `"In Stock"`/`"Out of Stock"` and `data.total_inventory` carries a live
+  unit count, which alerts surface as "Units in stock: N" so you know how
+  hard to race. Verified both ways live 2026-07-15 (both PS5 Slim SKUs out
+  of stock, an in-stock accessory reading `In Stock`/5 at the same moment).
+  National online inventory — their physical stores don't expose per-store
+  stock online either.
 - **Amazon.in — verified selector, medium confidence, location-dependent.**
   `#availability` reliably shows "Currently unavailable." when out of stock.
 - **Flipkart — verified via structured data, high confidence for "in stock

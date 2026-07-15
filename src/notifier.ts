@@ -76,7 +76,10 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
   const linkUrl = target.displayUrl ?? target.url;
   // Opt-in extra context (see Target.detailJsonPath) - e.g. which store an
   // offer is fulfilled from, so the reader can judge how real the stock is.
-  const detailLine = target.detailJsonPath && result.detail ? `\nSource: ${result.detail}` : "";
+  // The label defaults to "Source" but a target can override it when the
+  // detail is something else entirely (see Target.detailLabel).
+  const detailLabel = target.detailLabel ?? "Source";
+  const detailLine = target.detailJsonPath && result.detail ? `\n${detailLabel}: ${result.detail}` : "";
 
   const discordEmbed = {
     title: target.label,
@@ -85,7 +88,7 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
     fields: [
       { name: "Status", value: result.status, inline: true },
       { name: "Checked at", value: result.checkedAt, inline: true },
-      ...(target.detailJsonPath && result.detail ? [{ name: "Source", value: result.detail, inline: false }] : []),
+      ...(target.detailJsonPath && result.detail ? [{ name: detailLabel, value: result.detail, inline: false }] : []),
     ],
   };
   const telegramText = `🚨 *IN STOCK* — ${target.label}\n${linkUrl}${detailLine}\nChecked at: ${result.checkedAt}`;
