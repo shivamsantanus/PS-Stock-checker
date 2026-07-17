@@ -129,6 +129,12 @@ export interface StockResult {
   checkedAt: string; // ISO timestamp
   detail?: string; // raw matched text, for debugging
   error?: string;
+  // Set post-check by detectPhantomStock (see phantomDetection.ts) when an
+  // IN_STOCK read is suspected to be Reliance Digital's phantom store-stock
+  // failure mode (a fulfilling store repeated across pincodes too far apart
+  // to plausibly share a store) - downgrades the alert's framing without
+  // changing `status` itself.
+  phantomWarning?: string;
 }
 
 export interface StateEntry {

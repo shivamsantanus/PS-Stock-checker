@@ -81,24 +81,37 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
   const detailLabel = target.detailLabel ?? "Source";
   const detailLine = target.detailJsonPath && result.detail ? `\n${detailLabel}: ${result.detail}` : "";
 
+  // Downgraded framing when detectPhantomStock (see phantomDetection.ts)
+  // flagged this read as a likely Reliance Digital phantom-store offer - the
+  // status is still IN_STOCK for state-tracking purposes, but the alert
+  // itself must not read as a confident "go buy it now".
+  const isSuspectedPhantom = Boolean(result.phantomWarning);
+  const emoji = isSuspectedPhantom ? "⚠️" : "🚨";
+  const headline = isSuspectedPhantom ? "SUSPECTED STOCK (unconfirmed)" : "IN STOCK";
+  const color = isSuspectedPhantom ? 0xe67e22 : 0x2ecc71; // orange vs green
+  const phantomLine = result.phantomWarning ? `\n⚠️ ${result.phantomWarning}` : "";
+
   const discordEmbed = {
     title: target.label,
     url: linkUrl,
-    color: 0x2ecc71, // green
+    color,
     fields: [
       { name: "Status", value: result.status, inline: true },
       { name: "Checked at", value: result.checkedAt, inline: true },
       ...(target.detailJsonPath && result.detail ? [{ name: detailLabel, value: result.detail, inline: false }] : []),
+      ...(result.phantomWarning ? [{ name: "⚠️ Confidence warning", value: result.phantomWarning, inline: false }] : []),
     ],
   };
-  const telegramText = `🚨 *IN STOCK* — ${target.label}\n${linkUrl}${detailLine}\nChecked at: ${result.checkedAt}`;
+  const telegramText = `${emoji} *${headline}* — ${target.label}\n${linkUrl}${detailLine}${phantomLine}\nChecked at: ${result.checkedAt}`;
 
   await Promise.all([
-    postToDiscord(`🚨 **IN STOCK** — ${target.label}`, discordEmbed),
+    postToDiscord(`${emoji} **${headline}** — ${target.label}`, discordEmbed),
     postToTelegram(telegramText),
   ]);
 
-  logger.info("Sent in-stock alert", { targetId: target.id });
+  logger.info(isSuspectedPhantom ? "Sent suspected-phantom-stock alert" : "Sent in-stock alert", {
+    targetId: target.id,
+  });
 }
 
 export async function notifyComingSoon(result: StockResult): Promise<void> {
