@@ -515,6 +515,18 @@ export const TARGETS: Target[] = [
     outOfStockValues: ["schema.org/outofstock"],
     inStockValues: ["schema.org/instock"],
   },
+  {
+    // Added 2026-07-27 - newer console revision (CFI-2116A01Y) bundled with
+    // Astro's Playroom, different listing/pid from flipkart-national above.
+    // Same jsonLD-based strategy and same location caveat applies.
+    id: "flipkart-ps5-cfi-2116-astros-playroom",
+    label: "Flipkart - PS5 Console CFI-2116A01Y w/ Astro's Playroom (location = wherever this script runs from)",
+    url: "https://www.flipkart.com/sony-ps5-console-cfi-2116a01y-1024-gb-astros-playroom/p/itmd38e3aba0e54b?pid=GMCHPBNJAP2BPAXK",
+    strategy: "dom",
+    selector: "script#jsonLD",
+    outOfStockValues: ["schema.org/outofstock"],
+    inStockValues: ["schema.org/instock"],
+  },
 
   // --- Reliance Digital, added 2026-07-15 after a missed restock the
   // previous day; reworked to per-pincode targets the SAME day after the
