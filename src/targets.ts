@@ -756,6 +756,26 @@ export const TARGETS: Target[] = [
       inStockValues: ["add"],
     },
     {
+      // Added 2026-07-29 - newer console revision (CFI-2116A01Y, Standard
+      // Edition), different product/prid from blinkit-ps5-* above (added
+      // alongside it, not replacing it, so both listings stay tracked).
+      // Same location-picker flow and selectors - Blinkit's per-product page
+      // layout is consistent across SKUs.
+      id: `blinkit-ps5-cfi-2116a01y-${pincode}`,
+      label: `Blinkit - ${city} ${pincode} (CFI-2116A01Y Standard Edition)`,
+      url: "https://blinkit.com/prn/playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white/prid/763266",
+      strategy: "dom",
+      preActions: [
+        { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+        { action: "fill", selector: "input[name='select-locality']", value: pincode, waitAfterMs: 2000 },
+        { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+      ],
+      selector: "div[class*='ProductWrapperRightSection']",
+      comingSoonValues: ["coming soon"],
+      outOfStockValues: ["out of stock"],
+      inStockValues: ["add"],
+    },
+    {
       // PLACEHOLDER preActions - CONFIRMED NOT TO WORK, live-tested
       // 2026-07-08 against this exact product URL. Findings:
       //   - The real product page has NO location/pincode picker element at
@@ -925,6 +945,28 @@ export const TARGETS: Target[] = [
     outOfStockValues: ["out of stock"],
     inStockValues: ["add"],
   },
+  {
+    // Added 2026-07-29 - CFI-2116A01Y Standard Edition, same address/flow as
+    // blinkit-ps5-kadugodi-560067 above, just the newer listing.
+    id: "blinkit-ps5-cfi-2116a01y-kadugodi-560067",
+    label: "Blinkit - Kadugodi, Whitefield, Bangalore 560067 (CFI-2116A01Y Standard Edition)",
+    url: "https://blinkit.com/prn/playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white/prid/763266",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+      {
+        action: "fill",
+        selector: "input[name='select-locality']",
+        value: "Kadugodi Whitefield 560067",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+    ],
+    selector: "div[class*='ProductWrapperRightSection']",
+    comingSoonValues: ["coming soon"],
+    outOfStockValues: ["out of stock"],
+    inStockValues: ["add"],
+  },
 
   // --- User-specific address, added 2026-07-10: P6, Jeevan Bheema Nagar,
   // LIC Colony, near Dr. Chaitanya Dental Clinic, Bengaluru 560075. ---------
@@ -984,6 +1026,28 @@ export const TARGETS: Target[] = [
     id: "blinkit-ps5-jeevanbhimanagar-560075",
     label: "Blinkit - Jeevan Bhima Nagar, LIC Colony, Bangalore 560075",
     url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+      {
+        action: "fill",
+        selector: "input[name='select-locality']",
+        value: "Jeevan Bheema Nagar LIC Colony 560075",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+    ],
+    selector: "div[class*='ProductWrapperRightSection']",
+    comingSoonValues: ["coming soon"],
+    outOfStockValues: ["out of stock"],
+    inStockValues: ["add"],
+  },
+  {
+    // Added 2026-07-29 - CFI-2116A01Y Standard Edition, same address/flow as
+    // blinkit-ps5-jeevanbhimanagar-560075 above, just the newer listing.
+    id: "blinkit-ps5-cfi-2116a01y-jeevanbhimanagar-560075",
+    label: "Blinkit - Jeevan Bhima Nagar, LIC Colony, Bangalore 560075 (CFI-2116A01Y Standard Edition)",
+    url: "https://blinkit.com/prn/playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white/prid/763266",
     strategy: "dom",
     preActions: [
       { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
@@ -1060,6 +1124,28 @@ export const TARGETS: Target[] = [
     id: "blinkit-ps5-chikkabellandur-560035",
     label: "Blinkit - Chikkabellandur, Sarjapura, Bangalore 560035",
     url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+      {
+        action: "fill",
+        selector: "input[name='select-locality']",
+        value: "Chikkabellandur Sarjapura 560035",
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+    ],
+    selector: "div[class*='ProductWrapperRightSection']",
+    comingSoonValues: ["coming soon"],
+    outOfStockValues: ["out of stock"],
+    inStockValues: ["add"],
+  },
+  {
+    // Added 2026-07-29 - CFI-2116A01Y Standard Edition, same address/flow as
+    // blinkit-ps5-chikkabellandur-560035 above, just the newer listing.
+    id: "blinkit-ps5-cfi-2116a01y-chikkabellandur-560035",
+    label: "Blinkit - Chikkabellandur, Sarjapura, Bangalore 560035 (CFI-2116A01Y Standard Edition)",
+    url: "https://blinkit.com/prn/playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white/prid/763266",
     strategy: "dom",
     preActions: [
       { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
