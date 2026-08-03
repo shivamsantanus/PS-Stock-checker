@@ -1,5 +1,7 @@
 import { Browser, BrowserContext, Page, chromium } from "playwright";
 import axios from "axios";
+import fs from "fs/promises";
+import path from "path";
 import { config } from "./config";
 import { logger } from "./logger";
 import { InStockConfirmation, StockResult, StockStatus, Target } from "./types";
@@ -119,11 +121,30 @@ export class StockChecker {
     }
   }
 
+  /**
+   * Saves a screenshot + full HTML dump for a failed DOM check, so a
+   * pre-action selector timeout can be told apart from "site changed its
+   * markup" vs. "got served a bot-detection/CAPTCHA/blocked page" without
+   * needing a live browser on hand. Swallows its own errors - a failed debug
+   * capture should never mask the real check error.
+   */
+  private async captureDebugArtifacts(page: Page, targetId: string): Promise<void> {
+    try {
+      await fs.mkdir(config.debugDir, { recursive: true });
+      const base = path.join(config.debugDir, targetId);
+      await page.screenshot({ path: `${base}.png`, fullPage: true });
+      await fs.writeFile(`${base}.html`, await page.content());
+    } catch (err: any) {
+      logger.warn(`Failed to capture debug artifacts for "${targetId}"`, { error: err.message });
+    }
+  }
+
   private async checkDom(target: Target): Promise<{ status: StockStatus; detail: string }> {
     if (!this.browser) throw new Error("Browser not initialized - call init() first");
     if (!target.selector) throw new Error(`Target "${target.id}" uses "dom" strategy but has no selector`);
 
     let context: BrowserContext | null = null;
+    let page: Page | null = null;
     try {
       context = await this.browser.newContext({
         userAgent: config.userAgent,
@@ -135,7 +156,7 @@ export class StockChecker {
         await context.addCookies(target.cookies.map((c) => ({ ...c, path: c.path ?? "/" })));
       }
 
-      const page = await context.newPage();
+      page = await context.newPage();
 
       await page.goto(target.url, {
         waitUntil: "domcontentloaded",
@@ -194,6 +215,9 @@ export class StockChecker {
       }
 
       return { status, detail: rawText };
+    } catch (err) {
+      if (page) await this.captureDebugArtifacts(page, target.id);
+      throw err;
     } finally {
       await context?.close();
     }

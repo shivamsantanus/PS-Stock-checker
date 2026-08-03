@@ -62,3 +62,16 @@ jobs:
         with:
           path: data/state.json
           key: stock-state-${{ github.run_id }}
+
+      # Only ever populated when a DOM check throws (e.g. a pre-action
+      # selector never appears) - lets us see whether a failing target got a
+      # changed page, a CAPTCHA/blocked page, or something else, without
+      # needing a live browser on hand.
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-artifacts-${{ github.run_id }}
+          path: data/debug/
+          if-no-files-found: ignore
+          retention-days: 3

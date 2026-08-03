@@ -62,6 +62,12 @@ export const config = {
     process.env.STATE_FILE_PATH || "./data/state.json"
   ),
 
+  // Screenshot + HTML dump saved here whenever a DOM check throws (e.g. a
+  // pre-action selector never appears) - the only way to tell "site changed
+  // its markup" apart from "got served a bot-detection/CAPTCHA page" without
+  // eyeballing a live browser. CI uploads this directory as a build artifact.
+  debugDir: path.resolve(process.cwd(), process.env.DEBUG_DIR || "./data/debug"),
+
   logLevel: (process.env.LOG_LEVEL || "info") as "debug" | "info" | "warn" | "error",
 
   userAgent:
