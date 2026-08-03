@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PS5 Stock Checker — Pincodes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f8;
+    --panel: #ffffff;
+    --border: #dcdde1;
+    --text: #1c1e21;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --danger: #dc2626;
+    --danger-hover: #b91c1c;
+    --row-hover: #f0f4ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181d;
+      --panel: #1f2229;
+      --border: #33363f;
+      --text: #e6e6e6;
+      --muted: #9a9ea7;
+      --accent: #4f83ff;
+      --accent-hover: #6f9aff;
+      --danger: #f04747;
+      --danger-hover: #ff6666;
+      --row-hover: #262a33;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  header h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  header p { margin: 0; color: var(--muted); font-size: 0.85rem; }
+  main {
+    max-width: 1100px;
+    margin: 24px auto;
+    padding: 0 20px 60px;
+  }
+  .summary {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .summary strong { color: var(--text); font-size: 1rem; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 24px;
+  }
+  .panel h2 { margin: 0 0 12px; font-size: 1rem; }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 110px 1.4fr 1.4fr 110px 110px 90px;
+    gap: 10px;
+    align-items: end;
+  }
+  .form-grid label {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  input[type="text"] {
+    width: 100%;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.85rem;
+  }
+  .checkbox-cell { display: flex; align-items: center; gap: 6px; height: 34px; }
+  .checkbox-cell label { margin: 0; color: var(--text); font-size: 0.8rem; }
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    font-weight: 500;
+  }
+  button.primary { background: var(--accent); color: #fff; }
+  button.primary:hover { background: var(--accent-hover); }
+  button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  button.secondary:hover { background: var(--row-hover); }
+  button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  button.danger:hover { background: var(--danger); color: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:hover td { background: var(--row-hover); }
+  td.actions { display: flex; gap: 6px; white-space: nowrap; }
+  td.mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  .muted { color: var(--muted); }
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 2px 7px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+  }
+  .tag.on { border-color: var(--accent); color: var(--accent); }
+  #error-banner {
+    display: none;
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+  }
+  .row-editing input[type="text"] { min-width: 90px; }
+  .empty-state { padding: 30px; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>PS5 Stock Checker — Pincodes</h1>
+  <p>Add, edit, and remove the pincodes/addresses the checker monitors. Changes are written to data/pincodes.json — commit &amp; push that file for the GitHub Actions cron to pick them up.</p>
+</header>
+<main>
+  <div id="error-banner"></div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="panel">
+    <h2>Add a pincode</h2>
+    <div class="form-grid">
+      <div>
+        <label>Pincode</label>
+        <input type="text" id="add-pincode" maxlength="6" placeholder="560075" />
+      </div>
+      <div>
+        <label>City / address label</label>
+        <input type="text" id="add-city" placeholder="Bangalore" />
+      </div>
+      <div>
+        <label>Search text override (optional)</label>
+        <input type="text" id="add-searchText" placeholder="leave blank to use pincode" />
+      </div>
+      <div class="checkbox-cell">
+        <input type="checkbox" id="add-quickCommerce" checked />
+        <label for="add-quickCommerce">Quick-commerce</label>
+      </div>
+      <div class="checkbox-cell">
+        <input type="checkbox" id="add-relianceDigital" />
+        <label for="add-relianceDigital">Reliance Digital</label>
+      </div>
+      <div>
+        <button class="primary" id="add-submit">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="padding: 0;">
+    <table>
+      <thead>
+        <tr>
+          <th>Pincode</th>
+          <th>City / label</th>
+          <th>Search text override</th>
+          <th>Quick-commerce</th>
+          <th>Reliance Digital</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty-state" id="empty-state" style="display: none;">No pincodes yet — add one above.</div>
+  </div>
+</main>
+
+<script>
+  const API = "/api/pincodes";
+  let entries = [];
+  let editingId = null;
+
+  function showError(message) {
+    const el = document.getElementById("error-banner");
+    if (!message) {
+      el.style.display = "none";
+      el.textContent = "";
+      return;
+    }
+    el.textContent = message;
+    el.style.display = "block";
+  }
+
+  async function api(method, path, body) {
+    const res = await fetch(path, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    return data;
+  }
+
+  function renderSummary() {
+    const qc = entries.filter((e) => e.quickCommerce).length;
+    const rd = entries.filter((e) => e.relianceDigital).length;
+    document.getElementById("summary").innerHTML =
+      `<span><strong>${entries.length}</strong> pincodes tracked</span>` +
+      `<span><strong>${qc}</strong> in quick-commerce (Blinkit/Zepto/Instamart)</span>` +
+      `<span><strong>${rd}</strong> in Reliance Digital</span>`;
+  }
+
+  function tagHtml(on, label) {
+    return `<span class="tag ${on ? "on" : ""}">${on ? "✓" : "—"} ${label}</span>`;
+  }
+
+  function renderRows() {
+    const tbody = document.getElementById("rows");
+    tbody.innerHTML = "";
+    document.getElementById("empty-state").style.display = entries.length === 0 ? "block" : "none";
+
+    for (const entry of entries) {
+      const tr = document.createElement("tr");
+
+      if (editingId === entry.id) {
+        tr.classList.add("row-editing");
+        tr.innerHTML = `
+          <td><input type="text" class="edit-pincode" value="${escapeAttr(entry.pincode)}" maxlength="6" /></td>
+          <td><input type="text" class="edit-city" value="${escapeAttr(entry.city)}" /></td>
+          <td><input type="text" class="edit-searchText" value="${escapeAttr(entry.searchText || "")}" /></td>
+          <td class="checkbox-cell"><input type="checkbox" class="edit-quickCommerce" ${entry.quickCommerce ? "checked" : ""} /></td>
+          <td class="checkbox-cell"><input type="checkbox" class="edit-relianceDigital" ${entry.relianceDigital ? "checked" : ""} /></td>
+          <td class="actions">
+            <button class="primary save-btn">Save</button>
+            <button class="secondary cancel-btn">Cancel</button>
+          </td>
+        `;
+        tr.querySelector(".save-btn").addEventListener("click", () => saveEdit(entry.id, tr));
+        tr.querySelector(".cancel-btn").addEventListener("click", () => { editingId = null; renderRows(); });
+      } else {
+        tr.innerHTML = `
+          <td class="mono">${escapeHtml(entry.pincode)}</td>
+          <td>${escapeHtml(entry.city)}</td>
+          <td class="muted">${entry.searchText ? escapeHtml(entry.searchText) : "<em>uses pincode</em>"}</td>
+          <td>${tagHtml(entry.quickCommerce, "QC")}</td>
+          <td>${tagHtml(entry.relianceDigital, "RD")}</td>
+          <td class="actions">
+            <button class="secondary edit-btn">Edit</button>
+            <button class="danger delete-btn">Delete</button>
+          </td>
+        `;
+        tr.querySelector(".edit-btn").addEventListener("click", () => { editingId = entry.id; renderRows(); });
+        tr.querySelector(".delete-btn").addEventListener("click", () => deleteEntry(entry.id, entry));
+      }
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function escapeAttr(value) { return escapeHtml(value); }
+
+  async function loadEntries() {
+    entries = await api("GET", API);
+    entries.sort((a, b) => a.city.localeCompare(b.city) || a.pincode.localeCompare(b.pincode));
+    renderSummary();
+    renderRows();
+  }
+
+  async function saveEdit(id, rowEl) {
+    const body = {
+      pincode: rowEl.querySelector(".edit-pincode").value.trim(),
+      city: rowEl.querySelector(".edit-city").value.trim(),
+      searchText: rowEl.querySelector(".edit-searchText").value.trim(),
+      quickCommerce: rowEl.querySelector(".edit-quickCommerce").checked,
+      relianceDigital: rowEl.querySelector(".edit-relianceDigital").checked,
+    };
+    try {
+      showError(null);
+      await api("PUT", `${API}/${encodeURIComponent(id)}`, body);
+      editingId = null;
+      await loadEntries();
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  async function deleteEntry(id, entry) {
+    if (!confirm(`Delete ${entry.city} ${entry.pincode}? This can't be undone here (though it's still in git history).`)) return;
+    try {
+      showError(null);
+      await api("DELETE", `${API}/${encodeURIComponent(id)}`);
+      await loadEntries();
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  async function addEntry() {
+    const body = {
+      pincode: document.getElementById("add-pincode").value.trim(),
+      city: document.getElementById("add-city").value.trim(),
+      searchText: document.getElementById("add-searchText").value.trim(),
+      quickCommerce: document.getElementById("add-quickCommerce").checked,
+      relianceDigital: document.getElementById("add-relianceDigital").checked,
+    };
+    try {
+      showError(null);
+      await api("POST", API, body);
+      document.getElementById("add-pincode").value = "";
+      document.getElementById("add-city").value = "";
+      document.getElementById("add-searchText").value = "";
+      document.getElementById("add-quickCommerce").checked = true;
+      document.getElementById("add-relianceDigital").checked = false;
+      await loadEntries();
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  document.getElementById("add-submit").addEventListener("click", addEntry);
+  loadEntries().catch((err) => showError(err.message));
+</script>
+</body>
+</html>

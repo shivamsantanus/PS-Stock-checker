@@ -13,13 +13,16 @@ target stays in stock.
 ├── src/
 │   ├── config.ts        # env var loading & validation
 │   ├── types.ts          # shared TypeScript interfaces
-│   ├── targets.ts         # <-- edit this: your list of locations to watch
+│   ├── targets.ts         # non-pincode targets + the 2 pincode-driven target factories
+│   ├── pincodeStore.ts    # reads/writes data/pincodes.json (shared by targets.ts and the admin UI)
+│   ├── admin/             # `npm run admin` - browser UI for managing pincodes, see below
 │   ├── logger.ts          # timestamped leveled console logger
 │   ├── stateManager.ts    # reads/writes data/state.json, detects transitions
 │   ├── notifier.ts        # Discord webhook + Telegram Bot API integration
 │   ├── scraper.ts         # Playwright (DOM) + Axios (API) check strategies
 │   └── index.ts           # scheduler / main loop / entrypoint
 ├── data/
+│   ├── pincodes.json      # pincodes/addresses to monitor - edit via `npm run admin`, tracked in git
 │   └── state.json         # generated at runtime, gitignored
 ├── .env.example
 ├── .gitignore
@@ -94,6 +97,49 @@ delivery location (see "Quick-commerce platforms" below):
   selector, value?, waitAfterMs? }` steps run after page load and before
   reading `selector`, to drive an on-page location picker (type a pincode,
   click a suggestion, or press Enter to submit).
+
+The pincodes/addresses fed into the Blinkit/Zepto/Instamart and Reliance
+Digital targets are the one part of `targets.ts` you don't need to edit by
+hand — see "Managing pincodes" below.
+
+## Managing pincodes
+
+```bash
+npm run admin
+# open http://localhost:4321
+```
+
+This starts a small local server with a browser UI for the pincode list that
+drives the Blinkit/Zepto/Instamart and Reliance Digital targets — add, edit,
+or delete a pincode without touching any `.ts` file. It reads and writes
+`data/pincodes.json` directly; `src/targets.ts` loads that same file at
+startup to build the actual target list, so every pincode row becomes 5
+quick-commerce targets and, if you also check the "Reliance Digital" box, 3
+more.
+
+A few things worth knowing:
+
+- **`Search text override`** is optional and normally left blank (the bare
+  pincode is typed into the site's location picker). Set it when a bare
+  pincode resolves ambiguously to more than one dark-store zone — this
+  happened live with 560067/Kadugodi, where searching the bare pincode
+  returned several distinct locality suggestions serving different stores.
+  In that case, type a fuller address (street/area + pincode) so the first
+  suggestion clicked is deterministically the right one — check the result
+  in a real browser first to confirm which suggestion it resolves to.
+- **Reliance Digital is opt-in per row** (unchecked by default) because
+  nearby pincodes usually resolve to the same regional RD store — ticking it
+  for every Bangalore pincode you track on quick-commerce would just repeat
+  the same RD check dozens of times per cycle for no new information. Tick
+  it for one representative pincode per city instead.
+- **Deleting a row stops checking it going forward** but doesn't touch any
+  history already recorded in `data/state.json` (that file just keys off
+  target id, and unrecognized ids are ignored).
+- **`ADMIN_PORT`** env var overrides the default port `4321` if it's taken.
+- **This only edits your local file.** `data/pincodes.json` is tracked in
+  git (unlike `data/state.json`) — if you rely on the GitHub Actions cron
+  (see "Running 24/7 on GitHub Actions" below), commit and push it after
+  making changes so the next scheduled run picks them up.
 
 ## Retailer confidence (PS5 console, India)
 

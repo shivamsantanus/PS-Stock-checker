@@ -1,4 +1,5 @@
 import { InStockConfirmation, Target } from "./types";
+import { PincodeEntry, loadPincodeEntriesSync } from "./pincodeStore";
 
 /**
  * Shared IN_STOCK guard for every Zepto target - see InStockConfirmation in
@@ -330,36 +331,216 @@ function gamesTheShopTarget(opts: { idSuffix: string; label: string; productId: 
 }
 
 /**
- * One representative pincode per priority city (nearby pincodes in the
- * flatMap list resolve to the same regional store, so checking all of them
- * would just repeat the same answer 3x per SKU).
+ * Every pincode/address this file tracks now lives in data/pincodes.json,
+ * managed via `npm run admin` (browser UI) instead of editing this file -
+ * see src/pincodeStore.ts for the schema. Each row's `quickCommerce`/
+ * `relianceDigital` flags pick which of the two generators below it feeds:
+ * the Reliance Digital list was historically a smaller curated set (one
+ * representative pincode per city - nearby pincodes resolve to the same
+ * regional store, so checking all of them would just repeat the same answer
+ * 3x per SKU), while quick-commerce (Blinkit/Zepto/Instamart) fans out to
+ * every pincode since each dark-store zone can genuinely differ.
  */
-const RELIANCE_DIGITAL_PINCODES: { pincode: string; city: string }[] = [
-  { pincode: "147002", city: "Patiala" },
-  { pincode: "753004", city: "Cuttack" },
-  { pincode: "122098", city: "Gurugram" },
-  { pincode: "751012", city: "Bhubaneswar" },
-  { pincode: "248001", city: "Dehradun" },
-  { pincode: "226016", city: "Lucknow" },
-  { pincode: "560075", city: "Bangalore" },
-  { pincode: "177211", city: "Amb" },
-  { pincode: "121001", city: "Faridabad" },
-  { pincode: "221010", city: "Varanasi" },
-  { pincode: "400701", city: "Ghansoli, Navi Mumbai" },
-  // Added 2026-07-16 - Pune/Mumbai pincode sweep requested by the user.
-  // One representative pincode each (411001/Pune, 400013/Mumbai) per this
-  // list's own dedup policy above - see the quick-commerce flatMap list
-  // below for all 6 requested pincodes individually.
-  { pincode: "411001", city: "Pune" },
-  { pincode: "400013", city: "Mumbai" },
-  // Added 2026-07-17 - requested pincode batch (570018/560072/500032/560098/
-  // 560048/560075). 560072, 560075 and 560048 were already covered (560075
-  // above, 560072/560048 via the quick-commerce flatMap list) - only the two
-  // new cities are added here per this list's dedup policy.
-  { pincode: "570018", city: "Mysore" },
-  { pincode: "500032", city: "Hyderabad" },
-  { pincode: "201002", city: "Ghaziabad" },
-];
+const PINCODE_ENTRIES = loadPincodeEntriesSync();
+
+/**
+ * The 3 Reliance Digital targets (per SKU) for one pincode entry - see the
+ * relianceDigitalTarget factory above for the verified per-pincode contract.
+ */
+function relianceDigitalPincodeTargets(entry: PincodeEntry): Target[] {
+  const { pincode, city } = entry;
+  return [
+    relianceDigitalTarget({
+      idSuffix: "ps5-slim",
+      label: "PS5 Slim Console (Disc)",
+      slug: "sony-playstation-ps5-slim-console-luh1rv-7537998",
+      pincode,
+      city,
+    }),
+    relianceDigitalTarget({
+      idSuffix: "ps5-slim-digital",
+      label: "PS5 Slim Digital Console",
+      slug: "sony-playstation-ps5-slim-digital-console-luh1rv-7537999",
+      pincode,
+      city,
+    }),
+    relianceDigitalTarget({
+      idSuffix: "ps5-digital-edition",
+      label: "PS5 Digital Edition Console",
+      slug: "sony-playstation-5-digital-edition-console",
+      pincode,
+      city,
+    }),
+  ];
+}
+
+/**
+ * The 5 quick-commerce targets (Blinkit x2 SKUs, Instamart placeholder,
+ * Zepto x2 SKUs) for one pincode entry. Uses `entry.searchText` instead of
+ * the bare pincode when set - needed because a bare-pincode search on
+ * Zepto/Blinkit can resolve ambiguously to more than one dark-store zone
+ * (live-verified case: pincode 560067/Kadugodi returned multiple distinct
+ * locality suggestions serving different stores) - a fuller address string
+ * makes the first suggestion clicked deterministically the right store.
+ * `entry.id` (not the bare pincode) is the id suffix so rows with a custom
+ * address get their own distinct target ids alongside a plain-pincode row
+ * for the same pincode.
+ */
+function quickCommercePincodeTargets(entry: PincodeEntry): Target[] {
+  const { id, pincode, city } = entry;
+  const locationValue = entry.searchText || pincode;
+
+  return [
+    {
+      // Blinkit's location picker is VERIFIED WORKING (see original
+      // 2026-07-08 live test on pincode 110001) - typing a pincode into the
+      // "Change Location" modal returns real suggestions, and clicking one
+      // actually updates the delivery address and re-renders availability.
+      id: `blinkit-ps5-${id}`,
+      label: `Blinkit - ${city} ${pincode}`,
+      url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
+      strategy: "dom",
+      preActions: [
+        // Opens the "Change Location" modal from the header.
+        { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+        { action: "fill", selector: "input[name='select-locality']", value: locationValue, waitAfterMs: 2000 },
+        // Clicks the first suggestion in the results list.
+        { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+      ],
+      // Scoped to the product's own info panel (breadcrumb/title/price/stock),
+      // NOT the whole page - this product page also renders "Top 10 products
+      // in this category" and "People also bought" carousels full of OTHER
+      // products' "ADD" buttons, so a page-wide selector would false-positive
+      // on those. `ProductWrapperRightSection` is a styled-components class
+      // that wraps only the real product's info column.
+      selector: "div[class*='ProductWrapperRightSection']",
+      // Confirmed live 2026-07-12 (Bhubaneswar 751012, PS5 Digital Edition):
+      // Blinkit pre-lists some SKUs as orderable-later with this exact badge.
+      comingSoonValues: ["coming soon"],
+      outOfStockValues: ["out of stock"],
+      inStockValues: ["add"],
+    },
+    {
+      // Added 2026-07-29 - newer console revision (CFI-2116A01Y, Standard
+      // Edition), different product/prid from the entry above (added
+      // alongside it, not replacing it, so both listings stay tracked).
+      // Same location-picker flow and selectors - Blinkit's per-product page
+      // layout is consistent across SKUs.
+      id: `blinkit-ps5-cfi-2116a01y-${id}`,
+      label: `Blinkit - ${city} ${pincode} (CFI-2116A01Y Standard Edition)`,
+      url: "https://blinkit.com/prn/playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white/prid/763266",
+      strategy: "dom",
+      preActions: [
+        { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+        { action: "fill", selector: "input[name='select-locality']", value: locationValue, waitAfterMs: 2000 },
+        { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+      ],
+      selector: "div[class*='ProductWrapperRightSection']",
+      comingSoonValues: ["coming soon"],
+      outOfStockValues: ["out of stock"],
+      inStockValues: ["add"],
+    },
+    {
+      // PLACEHOLDER preActions - CONFIRMED NOT TO WORK, live-tested
+      // 2026-07-08 against this exact product URL. Findings:
+      //   - The real product page has NO location/pincode picker element at
+      //     all - dumped every data-testid on the page (30 of them) and the
+      //     full header HTML; nothing resembling `address-selector` exists.
+      //     Stock appears to resolve server-side (IP-based), the same
+      //     caveat that applies to Amazon/Flipkart above.
+      //   - Swiggy's Instamart homepage (the only place with a real address
+      //     search flow) is bot-blocked outright in headless mode:
+      //     "Request Blocked - Your request looks automated".
+      // Net effect: every entry generated from this factory will click/fill
+      // against selectors that don't exist, silently no-op, and all of them
+      // will report the SAME (server-inferred) status regardless of pincode -
+      // this does NOT actually check per-city availability yet. `selector`
+      // below IS confirmed real (data-testid="sold-out" is genuinely present
+      // on the page today), so the OUT_OF_STOCK reading itself is
+      // trustworthy - just not the per-pincode part.
+      id: `instamart-ps5-${id}`,
+      label: `Swiggy Instamart - ${city} ${pincode} (location NOT verified - see comment)`,
+      url: "https://www.swiggy.com/stores/instamart/item/MXX8JAYWGR",
+      strategy: "dom",
+      preActions: [
+        { action: "click", selector: "[data-testid='address-selector']" },
+        {
+          action: "fill",
+          selector: "input[placeholder='Search for area, street name...']",
+          value: locationValue,
+          waitAfterMs: 1200,
+        },
+        { action: "click", selector: "[data-testid='address-search-result-0']", waitAfterMs: 1500 },
+      ],
+      selector: "[data-testid='sold-out']",
+      outOfStockValues: ["sold out"],
+      inStockValues: ["add"],
+    },
+    {
+      // VERIFIED live 2026-07-08 against the real product page below.
+      // Zepto's location picker DOES respond to headless automation, same
+      // as Blinkit's: opening the address modal via `user-address`, filling
+      // the search box, and clicking the first `address-search-item` result
+      // actually updates delivery location and re-renders availability -
+      // confirmed live by pincode 147002 flipping the CTA from
+      // "Add to Cart" to "Notify Me when back in stock".
+      //
+      // FALSE-POSITIVE FOUND AND FIXED 2026-07-08: a live run reported
+      // IN_STOCK for Gurugram/Bhubaneswar/Dehradun that had already reverted
+      // to OUT_OF_STOCK by the time it was checked manually. Root-caused by
+      // polling the buy-box every 300ms after clicking the address
+      // suggestion: the DOM keeps showing the STALE "Add to Cart" text from
+      // the default/no-pincode view for ~2.2s before Zepto actually
+      // re-fetches and re-renders availability for the new address. The
+      // previous 3500ms waitAfterMs had thin margin over that and could
+      // read mid-transition on a slower connection (e.g. a GitHub Actions
+      // runner). Bumped to 7000ms (~3x the observed transition time) below.
+      id: `zepto-ps5-${id}`,
+      label: `Zepto - ${city} ${pincode}`,
+      url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
+      strategy: "dom",
+      preActions: [
+        // Opens the "Select Location" modal from the header.
+        { action: "click", selector: "[data-testid='user-address']" },
+        { action: "fill", selector: "[data-testid='address-search-input'] input", value: locationValue, waitAfterMs: 2000 },
+        // Clicks the first suggestion in the results list. waitAfterMs is
+        // intentionally generous - see the false-positive note above.
+        { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
+      ],
+      // Scoped to the buy-box only (title/price/CTA) - confirmed NOT to
+      // include the page's global nav/footer, which also lists city names
+      // like "Patiala" and "Gurugram" that would otherwise false-positive
+      // on naive text matching. Like Flipkart's obfuscated classes, this is
+      // a hashed CSS-module class name that may rotate on Zepto redeploys -
+      // re-verify if this target starts erroring out.
+      selector: ".KQfnF.ckhcV",
+      outOfStockValues: ["notify me", "out of stock"],
+      inStockValues: ["add to cart"],
+      inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
+    },
+    {
+      // Same product family/site behavior as the entry above (standard
+      // edition) - selectors, location-picker flow, and the 7000ms
+      // false-positive-avoidance wait are identical, just a different
+      // product page. Confirmed live 2026-07-08 that this page uses the
+      // same buy-box class and correctly flips to "Notify Me when back in
+      // stock" once a pincode is applied.
+      id: `zepto-ps5-digital-${id}`,
+      label: `Zepto - ${city} ${pincode} (Digital Edition)`,
+      url: "https://www.zepto.com/pn/playstation-5-console-digital/pvid/4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
+      strategy: "dom",
+      preActions: [
+        { action: "click", selector: "[data-testid='user-address']" },
+        { action: "fill", selector: "[data-testid='address-search-input'] input", value: locationValue, waitAfterMs: 2000 },
+        { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
+      ],
+      selector: ".KQfnF.ckhcV",
+      outOfStockValues: ["notify me", "out of stock"],
+      inStockValues: ["add to cart"],
+      inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
+    },
+  ];
+}
 
 /**
  * --- Findings from live testing against each site while building this ---
@@ -534,30 +715,10 @@ export const TARGETS: Target[] = [
   // relianceDigitalTarget factory above for the root cause and the verified
   // per-pincode contract. At rework time: Bangalore 560075 read a live
   // qty-4 offer (genuinely orderable) while Patiala/Cuttack/Lucknow read
-  // `{}` (not deliverable) for the same SKUs at the same moment. ------------
-  ...RELIANCE_DIGITAL_PINCODES.flatMap(({ pincode, city }): Target[] => [
-    relianceDigitalTarget({
-      idSuffix: "ps5-slim",
-      label: "PS5 Slim Console (Disc)",
-      slug: "sony-playstation-ps5-slim-console-luh1rv-7537998",
-      pincode,
-      city,
-    }),
-    relianceDigitalTarget({
-      idSuffix: "ps5-slim-digital",
-      label: "PS5 Slim Digital Console",
-      slug: "sony-playstation-ps5-slim-digital-console-luh1rv-7537999",
-      pincode,
-      city,
-    }),
-    relianceDigitalTarget({
-      idSuffix: "ps5-digital-edition",
-      label: "PS5 Digital Edition Console",
-      slug: "sony-playstation-5-digital-edition-console",
-      pincode,
-      city,
-    }),
-  ]),
+  // `{}` (not deliverable) for the same SKUs at the same moment. Pincodes are
+  // sourced from data/pincodes.json (relianceDigital: true rows) - see the
+  // relianceDigitalPincodeTargets factory above. ---------------------------
+  ...PINCODE_ENTRIES.filter((e) => e.relianceDigital).flatMap(relianceDigitalPincodeTargets),
 
   // --- Reliance Digital pre-order watch, added 2026-07-16 - see the
   // relianceDigitalPreOrderTarget factory above for the verified
@@ -648,518 +809,10 @@ export const TARGETS: Target[] = [
     selector: "._16FRp0", // Flipkart's class names are obfuscated/rotate often - re-verify frequently
     inStockValues: ["add to cart"],
   },
-  // --- Priority pincodes, requested 2026-07-08 - checked on Blinkit, Zepto,
-  // and Instamart, in this priority order: Patiala (147002, 147001), Cuttack
-  // (753004, 753006), Gurugram (122098), Bhubaneswar (751012, 751006). ------
-  // Added the same day: Dehradun (248001), Lucknow (226016), Bangalore
-  // (560075) - live-verified end-to-end on Blinkit and Zepto (same selectors
-  // as their first live-tested entries below, using the real PS5 product
-  // page and pincode picker for each site).
-  //
-  // Instamart real product wired in 2026-07-08 (PS5 1TB Slim console,
-  // https://www.swiggy.com/stores/instamart/item/MXX8JAYWGR) - live-tested
-  // against this exact URL, but the per-pincode preActions are CONFIRMED
-  // NOT to work (no location picker exists on this page, and the homepage
-  // flow that has one is bot-blocked headless) - see the comment on the
-  // instamart-ps5-* entry below for the full finding.
-
-  ...(
-    [
-      { pincode: "147002", city: "Patiala" },
-      { pincode: "753004", city: "Cuttack" },
-      { pincode: "753006", city: "Cuttack" },
-      { pincode: "147001", city: "Patiala" },
-      { pincode: "122098", city: "Gurugram" },
-      { pincode: "751012", city: "Bhubaneswar" },
-      { pincode: "751006", city: "Bhubaneswar" },
-      { pincode: "248001", city: "Dehradun" },
-      { pincode: "226016", city: "Lucknow" },
-      { pincode: "560075", city: "Bangalore" },
-      // Added 2026-07-08 - same flatMap, so these get the same
-      // Blinkit/Instamart/Zepto entries as the priority pincodes above.
-      { pincode: "177211", city: "Amb" },
-      { pincode: "121010", city: "Faridabad" },
-      { pincode: "121001", city: "Faridabad" },
-      { pincode: "121003", city: "Faridabad" },
-      { pincode: "560072", city: "Bangalore" },
-      { pincode: "221010", city: "Varanasi" },
-      // Added 2026-07-10 - Bangalore pincode sweep requested by the user.
-      // (560072 already existed above - not duplicated here.)
-      { pincode: "560062", city: "Bangalore" },
-      { pincode: "560043", city: "Bangalore" },
-      { pincode: "560066", city: "Bangalore" },
-      { pincode: "560064", city: "Bangalore" },
-      { pincode: "560076", city: "Bangalore" },
-      { pincode: "560069", city: "Bangalore" },
-      { pincode: "560078", city: "Bangalore" },
-      { pincode: "560103", city: "Bangalore" },
-      { pincode: "560094", city: "Bangalore" },
-      { pincode: "560037", city: "Bangalore" },
-      { pincode: "560045", city: "Bangalore" },
-      { pincode: "560102", city: "Bangalore" },
-      { pincode: "560057", city: "Bangalore" },
-      { pincode: "560008", city: "Bangalore" },
-      { pincode: "560010", city: "Bangalore" },
-      { pincode: "560032", city: "Bangalore" },
-      { pincode: "560041", city: "Bangalore" },
-      { pincode: "560024", city: "Bangalore" },
-      { pincode: "560029", city: "Bangalore" },
-      { pincode: "560073", city: "Bangalore" },
-      { pincode: "560048", city: "Bangalore" },
-      { pincode: "560067", city: "Bangalore" },
-      { pincode: "560100", city: "Bangalore" },
-      { pincode: "560114", city: "Bangalore" },
-      // Added 2026-07-12 - Gagal Home, Sector 6, Ghansoli, Navi Mumbai.
-      { pincode: "400701", city: "Ghansoli, Navi Mumbai" },
-      // Added 2026-07-16 - Pune/Mumbai pincode sweep requested by the user.
-      { pincode: "411004", city: "Pune" },
-      { pincode: "411005", city: "Pune" },
-      { pincode: "411016", city: "Pune" },
-      { pincode: "411001", city: "Pune" },
-      { pincode: "411045", city: "Pune" },
-      { pincode: "400013", city: "Mumbai" },
-      // Added 2026-07-17 - requested pincode batch. 560072, 560075, and
-      // 560048 already exist above (added 2026-07-08/07-10) - not duplicated.
-      { pincode: "570018", city: "Mysore" },
-      { pincode: "500032", city: "Hyderabad" },
-      { pincode: "560098", city: "Bangalore" },
-      { pincode: "201002", city: "Ghaziabad" },
-    ] as { pincode: string; city: string }[]
-  ).flatMap(({ pincode, city }): Target[] => [
-    {
-      // Blinkit's location picker is VERIFIED WORKING (see original
-      // 2026-07-08 live test on pincode 110001) - typing a pincode into the
-      // "Change Location" modal returns real suggestions, and clicking one
-      // actually updates the delivery address and re-renders availability.
-      id: `blinkit-ps5-${pincode}`,
-      label: `Blinkit - ${city} ${pincode}`,
-      url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
-      strategy: "dom",
-      preActions: [
-        // Opens the "Change Location" modal from the header.
-        { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-        { action: "fill", selector: "input[name='select-locality']", value: pincode, waitAfterMs: 2000 },
-        // Clicks the first suggestion in the results list.
-        { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-      ],
-      // Scoped to the product's own info panel (breadcrumb/title/price/stock),
-      // NOT the whole page - this product page also renders "Top 10 products
-      // in this category" and "People also bought" carousels full of OTHER
-      // products' "ADD" buttons, so a page-wide selector would false-positive
-      // on those. `ProductWrapperRightSection` is a styled-components class
-      // that wraps only the real product's info column.
-      selector: "div[class*='ProductWrapperRightSection']",
-      // Confirmed live 2026-07-12 (Bhubaneswar 751012, PS5 Digital Edition):
-      // Blinkit pre-lists some SKUs as orderable-later with this exact badge.
-      comingSoonValues: ["coming soon"],
-      outOfStockValues: ["out of stock"],
-      inStockValues: ["add"],
-    },
-    {
-      // Added 2026-07-29 - newer console revision (CFI-2116A01Y, Standard
-      // Edition), different product/prid from blinkit-ps5-* above (added
-      // alongside it, not replacing it, so both listings stay tracked).
-      // Same location-picker flow and selectors - Blinkit's per-product page
-      // layout is consistent across SKUs.
-      id: `blinkit-ps5-cfi-2116a01y-${pincode}`,
-      label: `Blinkit - ${city} ${pincode} (CFI-2116A01Y Standard Edition)`,
-      url: "https://blinkit.com/prn/playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white/prid/763266",
-      strategy: "dom",
-      preActions: [
-        { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-        { action: "fill", selector: "input[name='select-locality']", value: pincode, waitAfterMs: 2000 },
-        { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-      ],
-      selector: "div[class*='ProductWrapperRightSection']",
-      comingSoonValues: ["coming soon"],
-      outOfStockValues: ["out of stock"],
-      inStockValues: ["add"],
-    },
-    {
-      // PLACEHOLDER preActions - CONFIRMED NOT TO WORK, live-tested
-      // 2026-07-08 against this exact product URL. Findings:
-      //   - The real product page has NO location/pincode picker element at
-      //     all - dumped every data-testid on the page (30 of them) and the
-      //     full header HTML; nothing resembling `address-selector` exists.
-      //     Stock appears to resolve server-side (IP-based), the same
-      //     caveat that applies to Amazon/Flipkart above.
-      //   - Swiggy's Instamart homepage (the only place with a real address
-      //     search flow) is bot-blocked outright in headless mode:
-      //     "Request Blocked - Your request looks automated".
-      // Net effect: every entry below will click/fill against selectors that
-      // don't exist, silently no-op, and all 10 will report the SAME
-      // (server-inferred) status regardless of pincode - this does NOT
-      // actually check per-city availability yet. `selector` below IS
-      // confirmed real (data-testid="sold-out" is genuinely present on the
-      // page today), so the OUT_OF_STOCK reading itself is trustworthy -
-      // just not the per-pincode part.
-      id: `instamart-ps5-${pincode}`,
-      label: `Swiggy Instamart - ${city} ${pincode} (location NOT verified - see comment)`,
-      url: "https://www.swiggy.com/stores/instamart/item/MXX8JAYWGR",
-      strategy: "dom",
-      preActions: [
-        { action: "click", selector: "[data-testid='address-selector']" },
-        { action: "fill", selector: "input[placeholder='Search for area, street name...']", value: pincode, waitAfterMs: 1200 },
-        { action: "click", selector: "[data-testid='address-search-result-0']", waitAfterMs: 1500 },
-      ],
-      selector: "[data-testid='sold-out']",
-      outOfStockValues: ["sold out"],
-      inStockValues: ["add"],
-    },
-    {
-      // VERIFIED live 2026-07-08 against the real product page below.
-      // Zepto's location picker DOES respond to headless automation, same
-      // as Blinkit's: opening the address modal via `user-address`, filling
-      // the search box, and clicking the first `address-search-item` result
-      // actually updates delivery location and re-renders availability -
-      // confirmed live by pincode 147002 flipping the CTA from
-      // "Add to Cart" to "Notify Me when back in stock".
-      //
-      // FALSE-POSITIVE FOUND AND FIXED 2026-07-08: a live run reported
-      // IN_STOCK for Gurugram/Bhubaneswar/Dehradun that had already reverted
-      // to OUT_OF_STOCK by the time it was checked manually. Root-caused by
-      // polling the buy-box every 300ms after clicking the address
-      // suggestion: the DOM keeps showing the STALE "Add to Cart" text from
-      // the default/no-pincode view for ~2.2s before Zepto actually
-      // re-fetches and re-renders availability for the new address. The
-      // previous 3500ms waitAfterMs had thin margin over that and could
-      // read mid-transition on a slower connection (e.g. a GitHub Actions
-      // runner). Bumped to 7000ms (~3x the observed transition time) below.
-      id: `zepto-ps5-${pincode}`,
-      label: `Zepto - ${city} ${pincode}`,
-      url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
-      strategy: "dom",
-      preActions: [
-        // Opens the "Select Location" modal from the header.
-        { action: "click", selector: "[data-testid='user-address']" },
-        { action: "fill", selector: "[data-testid='address-search-input'] input", value: pincode, waitAfterMs: 2000 },
-        // Clicks the first suggestion in the results list. waitAfterMs is
-        // intentionally generous - see the false-positive note above.
-        { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
-      ],
-      // Scoped to the buy-box only (title/price/CTA) - confirmed NOT to
-      // include the page's global nav/footer, which also lists city names
-      // like "Patiala" and "Gurugram" that would otherwise false-positive
-      // on naive text matching. Like Flipkart's obfuscated classes, this is
-      // a hashed CSS-module class name that may rotate on Zepto redeploys -
-      // re-verify if this target starts erroring out.
-      selector: ".KQfnF.ckhcV",
-      outOfStockValues: ["notify me", "out of stock"],
-      inStockValues: ["add to cart"],
-      inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
-    },
-    {
-      // Same product family/site behavior as zepto-ps5-* above (standard
-      // edition) - selectors, location-picker flow, and the 7000ms
-      // false-positive-avoidance wait are identical, just a different
-      // product page. Confirmed live 2026-07-08 that this page uses the
-      // same buy-box class and correctly flips to "Notify Me when back in
-      // stock" once a pincode is applied.
-      id: `zepto-ps5-digital-${pincode}`,
-      label: `Zepto - ${city} ${pincode} (Digital Edition)`,
-      url: "https://www.zepto.com/pn/playstation-5-console-digital/pvid/4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
-      strategy: "dom",
-      preActions: [
-        { action: "click", selector: "[data-testid='user-address']" },
-        { action: "fill", selector: "[data-testid='address-search-input'] input", value: pincode, waitAfterMs: 2000 },
-        { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
-      ],
-      selector: ".KQfnF.ckhcV",
-      outOfStockValues: ["notify me", "out of stock"],
-      inStockValues: ["add to cart"],
-      inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
-    },
-  ]),
-
-  // --- User-specific address, added 2026-07-10: A Block 313, DS Max Sangam
-  // Grand, Seeghehalli, Kadugodi, Whitefield, Bengaluru 560067. -------------
-  //
-  // NOT part of the pincode flatMap above on purpose: live-testing this
-  // pincode found that a bare "560067"/"560066" search on Zepto/Blinkit
-  // returns multiple distinct locality suggestions (Whitefield, Kadugodi,
-  // Whitefield - Hoskote Road, ...) that resolve to DIFFERENT dark stores
-  // with different stock - the flatMap's blind "click the first suggestion"
-  // approach can land on a different store than this specific address uses.
-  // Confirmed live 2026-07-10 that searching "Kadugodi Whitefield 560067"
-  // and clicking the first result resolves to address label "Kadugodi -
-  // Kadugodi, Bangalore, Karnataka", matching this address's real locality -
-  // both editions read OUT_OF_STOCK on Zepto and Blinkit at verification
-  // time.
-  {
-    id: "zepto-ps5-kadugodi-560067",
-    label: "Zepto - Kadugodi, Whitefield, Bangalore 560067",
-    url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "[data-testid='user-address']" },
-      {
-        action: "fill",
-        selector: "[data-testid='address-search-input'] input",
-        value: "Kadugodi Whitefield 560067",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
-    ],
-    selector: ".KQfnF.ckhcV",
-    outOfStockValues: ["notify me", "out of stock"],
-    inStockValues: ["add to cart"],
-    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
-  },
-  {
-    id: "zepto-ps5-digital-kadugodi-560067",
-    label: "Zepto - Kadugodi, Whitefield, Bangalore 560067 (Digital Edition)",
-    url: "https://www.zepto.com/pn/playstation-5-console-digital/pvid/4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "[data-testid='user-address']" },
-      {
-        action: "fill",
-        selector: "[data-testid='address-search-input'] input",
-        value: "Kadugodi Whitefield 560067",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
-    ],
-    selector: ".KQfnF.ckhcV",
-    outOfStockValues: ["notify me", "out of stock"],
-    inStockValues: ["add to cart"],
-    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
-  },
-  {
-    id: "blinkit-ps5-kadugodi-560067",
-    label: "Blinkit - Kadugodi, Whitefield, Bangalore 560067",
-    url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-      {
-        action: "fill",
-        selector: "input[name='select-locality']",
-        value: "Kadugodi Whitefield 560067",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-    ],
-    selector: "div[class*='ProductWrapperRightSection']",
-    comingSoonValues: ["coming soon"],
-    outOfStockValues: ["out of stock"],
-    inStockValues: ["add"],
-  },
-  {
-    // Added 2026-07-29 - CFI-2116A01Y Standard Edition, same address/flow as
-    // blinkit-ps5-kadugodi-560067 above, just the newer listing.
-    id: "blinkit-ps5-cfi-2116a01y-kadugodi-560067",
-    label: "Blinkit - Kadugodi, Whitefield, Bangalore 560067 (CFI-2116A01Y Standard Edition)",
-    url: "https://blinkit.com/prn/playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white/prid/763266",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-      {
-        action: "fill",
-        selector: "input[name='select-locality']",
-        value: "Kadugodi Whitefield 560067",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-    ],
-    selector: "div[class*='ProductWrapperRightSection']",
-    comingSoonValues: ["coming soon"],
-    outOfStockValues: ["out of stock"],
-    inStockValues: ["add"],
-  },
-
-  // --- User-specific address, added 2026-07-10: P6, Jeevan Bheema Nagar,
-  // LIC Colony, near Dr. Chaitanya Dental Clinic, Bengaluru 560075. ---------
-  //
-  // Unlike the Kadugodi/560067 case above, this one was checked and found
-  // NOT ambiguous: searching the bare pincode "560075" and searching the
-  // specific locality "Jeevan Bheema Nagar LIC Colony 560075" both resolve
-  // to the SAME dark-store zone label ("New Tippasandara") on Zepto, and
-  // both read identically OUT_OF_STOCK on Zepto and Blinkit at verification
-  // time - so the existing bare-pincode targets (`zepto-ps5-560075`,
-  // `blinkit-ps5-560075`, etc., from the flatMap above) already cover this
-  // address correctly. Added as its own explicit target anyway, purely so
-  // this specific address has its own tracked id/label in state.json rather
-  // than being implicitly bundled under the generic "Bangalore 560075"
-  // label - not because it revealed a different store.
-  {
-    id: "zepto-ps5-jeevanbhimanagar-560075",
-    label: "Zepto - Jeevan Bhima Nagar, LIC Colony, Bangalore 560075",
-    url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "[data-testid='user-address']" },
-      {
-        action: "fill",
-        selector: "[data-testid='address-search-input'] input",
-        value: "Jeevan Bheema Nagar LIC Colony 560075",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
-    ],
-    selector: ".KQfnF.ckhcV",
-    outOfStockValues: ["notify me", "out of stock"],
-    inStockValues: ["add to cart"],
-    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
-  },
-  {
-    id: "zepto-ps5-digital-jeevanbhimanagar-560075",
-    label: "Zepto - Jeevan Bhima Nagar, LIC Colony, Bangalore 560075 (Digital Edition)",
-    url: "https://www.zepto.com/pn/playstation-5-console-digital/pvid/4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "[data-testid='user-address']" },
-      {
-        action: "fill",
-        selector: "[data-testid='address-search-input'] input",
-        value: "Jeevan Bheema Nagar LIC Colony 560075",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
-    ],
-    selector: ".KQfnF.ckhcV",
-    outOfStockValues: ["notify me", "out of stock"],
-    inStockValues: ["add to cart"],
-    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
-  },
-  {
-    id: "blinkit-ps5-jeevanbhimanagar-560075",
-    label: "Blinkit - Jeevan Bhima Nagar, LIC Colony, Bangalore 560075",
-    url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-      {
-        action: "fill",
-        selector: "input[name='select-locality']",
-        value: "Jeevan Bheema Nagar LIC Colony 560075",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-    ],
-    selector: "div[class*='ProductWrapperRightSection']",
-    comingSoonValues: ["coming soon"],
-    outOfStockValues: ["out of stock"],
-    inStockValues: ["add"],
-  },
-  {
-    // Added 2026-07-29 - CFI-2116A01Y Standard Edition, same address/flow as
-    // blinkit-ps5-jeevanbhimanagar-560075 above, just the newer listing.
-    id: "blinkit-ps5-cfi-2116a01y-jeevanbhimanagar-560075",
-    label: "Blinkit - Jeevan Bhima Nagar, LIC Colony, Bangalore 560075 (CFI-2116A01Y Standard Edition)",
-    url: "https://blinkit.com/prn/playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white/prid/763266",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-      {
-        action: "fill",
-        selector: "input[name='select-locality']",
-        value: "Jeevan Bheema Nagar LIC Colony 560075",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-    ],
-    selector: "div[class*='ProductWrapperRightSection']",
-    comingSoonValues: ["coming soon"],
-    outOfStockValues: ["out of stock"],
-    inStockValues: ["add"],
-  },
-
-  // --- User-specific address, added 2026-07-13: WP27+FQR Kodathi Wipro
-  // Gate, Snehadaan Hospital Rd, opposite Road, Sarjapura, Ambedkar Nagar,
-  // Chikkabellandur, Bengaluru, Karnataka 560035. ---------------------------
-  //
-  // NOT part of the pincode flatMap above, same reasoning as the Kadugodi
-  // block: 560035 isn't in that list at all yet, and this is a specific
-  // address rather than a bare pincode. Confirmed live 2026-07-13 that
-  // searching "Chikkabellandur Sarjapura 560035" and clicking the first
-  // result resolves to a real, distinct dark-store zone on both platforms -
-  // Zepto: "Bellanduru - 464, Sarjapur - Marathahalli Road, Bellanduru,
-  // Bangalore, Karnataka"; Blinkit: "Sarjapur Main Rd, Janatha Colony,
-  // Chikkabellandur, Bengaluru, Karnataka" - not the same store as any
-  // existing target in this file. Both editions read OUT_OF_STOCK on Zepto
-  // ("Notify Me when back in stock") and OUT_OF_STOCK on Blinkit ("Out of
-  // stock") at verification time.
-  {
-    id: "zepto-ps5-chikkabellandur-560035",
-    label: "Zepto - Chikkabellandur, Sarjapura, Bangalore 560035",
-    url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "[data-testid='user-address']" },
-      {
-        action: "fill",
-        selector: "[data-testid='address-search-input'] input",
-        value: "Chikkabellandur Sarjapura 560035",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
-    ],
-    selector: ".KQfnF.ckhcV",
-    outOfStockValues: ["notify me", "out of stock"],
-    inStockValues: ["add to cart"],
-    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
-  },
-  {
-    id: "zepto-ps5-digital-chikkabellandur-560035",
-    label: "Zepto - Chikkabellandur, Sarjapura, Bangalore 560035 (Digital Edition)",
-    url: "https://www.zepto.com/pn/playstation-5-console-digital/pvid/4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "[data-testid='user-address']" },
-      {
-        action: "fill",
-        selector: "[data-testid='address-search-input'] input",
-        value: "Chikkabellandur Sarjapura 560035",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
-    ],
-    selector: ".KQfnF.ckhcV",
-    outOfStockValues: ["notify me", "out of stock"],
-    inStockValues: ["add to cart"],
-    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
-  },
-  {
-    id: "blinkit-ps5-chikkabellandur-560035",
-    label: "Blinkit - Chikkabellandur, Sarjapura, Bangalore 560035",
-    url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-      {
-        action: "fill",
-        selector: "input[name='select-locality']",
-        value: "Chikkabellandur Sarjapura 560035",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-    ],
-    selector: "div[class*='ProductWrapperRightSection']",
-    comingSoonValues: ["coming soon"],
-    outOfStockValues: ["out of stock"],
-    inStockValues: ["add"],
-  },
-  {
-    // Added 2026-07-29 - CFI-2116A01Y Standard Edition, same address/flow as
-    // blinkit-ps5-chikkabellandur-560035 above, just the newer listing.
-    id: "blinkit-ps5-cfi-2116a01y-chikkabellandur-560035",
-    label: "Blinkit - Chikkabellandur, Sarjapura, Bangalore 560035 (CFI-2116A01Y Standard Edition)",
-    url: "https://blinkit.com/prn/playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white/prid/763266",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-      {
-        action: "fill",
-        selector: "input[name='select-locality']",
-        value: "Chikkabellandur Sarjapura 560035",
-        waitAfterMs: 2000,
-      },
-      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-    ],
-    selector: "div[class*='ProductWrapperRightSection']",
-    comingSoonValues: ["coming soon"],
-    outOfStockValues: ["out of stock"],
-    inStockValues: ["add"],
-  },
+  // --- Quick-commerce pincodes (Blinkit/Zepto/Instamart), sourced from
+  // data/pincodes.json (quickCommerce: true rows) - see the
+  // quickCommercePincodeTargets factory above for the per-row target set and
+  // the searchText field's purpose. Includes the 3 formerly-hardcoded
+  // full-address rows (Kadugodi/Jeevan Bheema Nagar/Chikkabellandur). -------
+  ...PINCODE_ENTRIES.filter((e) => e.quickCommerce).flatMap(quickCommercePincodeTargets),
 ];
