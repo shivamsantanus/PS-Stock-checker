@@ -7,29 +7,39 @@
 <style>
   :root {
     color-scheme: light dark;
-    --bg: #f7f7f8;
+    --bg: #f5f6f8;
     --panel: #ffffff;
-    --border: #dcdde1;
+    --border: #dfe1e6;
     --text: #1c1e21;
     --muted: #6b7280;
     --accent: #2563eb;
     --accent-hover: #1d4ed8;
+    --accent-soft: #eaf1ff;
     --danger: #dc2626;
     --danger-hover: #b91c1c;
-    --row-hover: #f0f4ff;
+    --danger-soft: #fee2e2;
+    --warn: #b45309;
+    --warn-soft: #fef3c7;
+    --row-hover: #f3f6fd;
+    --shadow: 0 12px 32px rgba(20, 24, 33, 0.16);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #16181d;
+      --bg: #14161b;
       --panel: #1f2229;
       --border: #33363f;
-      --text: #e6e6e6;
+      --text: #e8e8ea;
       --muted: #9a9ea7;
-      --accent: #4f83ff;
-      --accent-hover: #6f9aff;
-      --danger: #f04747;
-      --danger-hover: #ff6666;
+      --accent: #5b8bff;
+      --accent-hover: #7ba0ff;
+      --accent-soft: #223256;
+      --danger: #f0575a;
+      --danger-hover: #ff7a7d;
+      --danger-soft: #3a1f22;
+      --warn: #e0a83f;
+      --warn-soft: #3a3220;
       --row-hover: #262a33;
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
     }
   }
   * { box-sizing: border-box; }
@@ -40,63 +50,48 @@
     color: var(--text);
   }
   header {
-    padding: 20px 28px;
+    padding: 22px 28px;
     border-bottom: 1px solid var(--border);
     background: var(--panel);
   }
-  header h1 { margin: 0 0 4px; font-size: 1.3rem; }
-  header p { margin: 0; color: var(--muted); font-size: 0.85rem; }
-  main {
-    max-width: 1100px;
-    margin: 24px auto;
-    padding: 0 20px 60px;
-  }
-  .summary {
+  header h1 { margin: 0 0 6px; font-size: 1.35rem; }
+  header p { margin: 0; color: var(--muted); font-size: 0.9rem; max-width: 720px; line-height: 1.5; }
+  main { max-width: 1000px; margin: 24px auto; padding: 0 20px 60px; }
+
+  .toolbar {
     display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
-    font-size: 0.85rem;
-    color: var(--muted);
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
   }
-  .summary strong { color: var(--text); font-size: 1rem; }
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 18px 20px;
-    margin-bottom: 24px;
+  .toolbar-summary { font-size: 0.9rem; color: var(--muted); }
+  .toolbar-summary strong { color: var(--text); }
+  .search-input {
+    flex: 1;
+    min-width: 200px;
+    max-width: 320px;
   }
-  .panel h2 { margin: 0 0 12px; font-size: 1rem; }
-  .form-grid {
-    display: grid;
-    grid-template-columns: 110px 1.4fr 1.4fr 110px 110px 90px;
-    gap: 10px;
-    align-items: end;
-  }
-  .form-grid label {
-    display: block;
-    font-size: 0.72rem;
-    color: var(--muted);
-    margin-bottom: 4px;
-  }
-  input[type="text"] {
+
+  input[type="text"], input[type="search"] {
     width: 100%;
-    padding: 7px 9px;
+    padding: 9px 11px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 7px;
     background: var(--bg);
     color: var(--text);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
   }
-  .checkbox-cell { display: flex; align-items: center; gap: 6px; height: 34px; }
-  .checkbox-cell label { margin: 0; color: var(--text); font-size: 0.8rem; }
+  input[type="text"]:focus, input[type="search"]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
   button {
     cursor: pointer;
     border: none;
-    border-radius: 6px;
-    padding: 8px 14px;
-    font-size: 0.82rem;
-    font-weight: 500;
+    border-radius: 7px;
+    padding: 9px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
   }
   button.primary { background: var(--accent); color: #fff; }
   button.primary:hover { background: var(--accent-hover); }
@@ -104,106 +99,247 @@
   button.secondary:hover { background: var(--row-hover); }
   button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
   button.danger:hover { background: var(--danger); color: #fff; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
-  tr:hover td { background: var(--row-hover); }
-  td.actions { display: flex; gap: 6px; white-space: nowrap; }
-  td.mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
-  .muted { color: var(--muted); }
-  .tag {
-    display: inline-block;
-    font-size: 0.7rem;
-    padding: 2px 7px;
+  button.small { padding: 6px 11px; font-size: 0.78rem; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; background: var(--bg); }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr:last-child td { border-bottom: none; }
+  td.mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.95rem; white-space: nowrap; }
+  .city-cell .address-note { display: block; margin-top: 3px; font-size: 0.78rem; color: var(--muted); font-style: italic; }
+  td.actions { white-space: nowrap; }
+  td.actions button { margin-right: 6px; }
+
+  .badges { display: flex; flex-direction: column; gap: 5px; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    padding: 3px 9px;
     border-radius: 100px;
     border: 1px solid var(--border);
+    color: var(--muted);
+    width: fit-content;
   }
-  .tag.on { border-color: var(--accent); color: var(--accent); }
+  .badge.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .badge.warn { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+
+  .empty-state { padding: 40px 20px; text-align: center; color: var(--muted); }
+  .empty-state button { margin-top: 12px; }
+
   #error-banner {
     display: none;
-    background: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #fca5a5;
-    border-radius: 8px;
-    padding: 10px 14px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--danger-soft);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: 9px;
+    padding: 11px 14px;
     margin-bottom: 16px;
-    font-size: 0.85rem;
+    font-size: 0.88rem;
   }
-  .row-editing input[type="text"] { min-width: 90px; }
-  .empty-state { padding: 30px; text-align: center; color: var(--muted); }
+  #error-banner button { background: transparent; border: none; color: inherit; font-size: 1rem; padding: 0 4px; }
+
+  /* --- Dialog (used for both Add and Edit) --- */
+  dialog {
+    border: none;
+    border-radius: 14px;
+    padding: 0;
+    width: min(520px, 92vw);
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: var(--shadow);
+  }
+  dialog::backdrop { background: rgba(10, 12, 16, 0.55); }
+  #pincode-form { padding: 26px 26px 22px; }
+  #dialog-title { margin: 0 0 6px; font-size: 1.15rem; }
+  .dialog-desc { margin: 0 0 20px; color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+
+  .field { margin-bottom: 18px; }
+  .field label, .field-label { display: block; font-weight: 600; font-size: 0.86rem; margin-bottom: 5px; }
+  .field .hint { margin: 5px 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.4; }
+
+  .toggle-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 13px;
+    margin-top: 8px;
+    cursor: pointer;
+  }
+  .toggle-card:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .toggle-card input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--accent); flex-shrink: 0; }
+  .toggle-card-title { font-weight: 600; font-size: 0.88rem; }
+  .toggle-card-desc { color: var(--muted); font-size: 0.78rem; margin-top: 1px; }
+
+  details.advanced { border: 1px solid var(--border); border-radius: 10px; padding: 10px 13px; margin-bottom: 18px; }
+  details.advanced summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--accent); }
+  details.advanced .hint { margin: 8px 0 10px; }
+
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+
+  #toast {
+    position: fixed;
+    bottom: 22px;
+    right: 22px;
+    background: var(--text);
+    color: var(--panel);
+    padding: 11px 18px;
+    border-radius: 9px;
+    font-size: 0.85rem;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
 </style>
 </head>
 <body>
 <header>
   <h1>PS5 Stock Checker — Pincodes</h1>
-  <p>Add, edit, and remove the pincodes/addresses the checker monitors. Changes are written to data/pincodes.json — commit &amp; push that file for the GitHub Actions cron to pick them up.</p>
+  <p>
+    This page controls which pincodes get checked for PS5 stock, and which apps
+    each one is checked on. Add, edit, or remove a pincode here — no code
+    changes needed. After you save changes here, commit &amp; push
+    <code>data/pincodes.json</code> so the scheduled checker (GitHub Actions)
+    picks them up too.
+  </p>
 </header>
 <main>
-  <div id="error-banner"></div>
-
-  <div class="summary" id="summary"></div>
-
-  <div class="panel">
-    <h2>Add a pincode</h2>
-    <div class="form-grid">
-      <div>
-        <label>Pincode</label>
-        <input type="text" id="add-pincode" maxlength="6" placeholder="560075" />
-      </div>
-      <div>
-        <label>City / address label</label>
-        <input type="text" id="add-city" placeholder="Bangalore" />
-      </div>
-      <div>
-        <label>Search text override (optional)</label>
-        <input type="text" id="add-searchText" placeholder="leave blank to use pincode" />
-      </div>
-      <div class="checkbox-cell">
-        <input type="checkbox" id="add-quickCommerce" checked />
-        <label for="add-quickCommerce">Quick-commerce</label>
-      </div>
-      <div class="checkbox-cell">
-        <input type="checkbox" id="add-relianceDigital" />
-        <label for="add-relianceDigital">Reliance Digital</label>
-      </div>
-      <div>
-        <button class="primary" id="add-submit">Add</button>
-      </div>
-    </div>
+  <div id="error-banner">
+    <span id="error-text"></span>
+    <button type="button" id="error-dismiss" aria-label="Dismiss">✕</button>
   </div>
 
-  <div class="panel" style="padding: 0;">
+  <div class="toolbar">
+    <div class="toolbar-summary" id="summary"></div>
+    <input type="search" class="search-input" id="search-box" placeholder="Search by city or pincode…" />
+    <button class="primary" id="open-add">+ Add a pincode</button>
+  </div>
+
+  <div class="panel">
     <table>
       <thead>
         <tr>
           <th>Pincode</th>
           <th>City / label</th>
-          <th>Search text override</th>
-          <th>Quick-commerce</th>
-          <th>Reliance Digital</th>
+          <th>Checked on</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
-    <div class="empty-state" id="empty-state" style="display: none;">No pincodes yet — add one above.</div>
+    <div class="empty-state" id="empty-state" style="display: none;"></div>
   </div>
 </main>
+
+<dialog id="pincode-dialog">
+  <form id="pincode-form">
+    <h2 id="dialog-title">Add a pincode</h2>
+    <p class="dialog-desc">
+      Enter the delivery pincode you want watched, and choose which apps it
+      should be checked on.
+    </p>
+
+    <div class="field">
+      <label for="f-pincode">Pincode</label>
+      <input type="text" id="f-pincode" maxlength="6" placeholder="e.g. 560075" inputmode="numeric" />
+    </div>
+
+    <div class="field">
+      <label for="f-city">City or label</label>
+      <input type="text" id="f-city" placeholder="e.g. Bangalore" />
+      <p class="hint">Just a name so you can recognize this row later — the city name is fine.</p>
+    </div>
+
+    <div class="field">
+      <span class="field-label">Check this pincode on:</span>
+
+      <label class="toggle-card">
+        <input type="checkbox" id="f-quickCommerce" />
+        <div>
+          <div class="toggle-card-title">🛵 Delivery apps</div>
+          <div class="toggle-card-desc">Blinkit, Zepto, and Swiggy Instamart</div>
+        </div>
+      </label>
+
+      <label class="toggle-card">
+        <input type="checkbox" id="f-relianceDigital" />
+        <div>
+          <div class="toggle-card-title">🏬 Reliance Digital</div>
+          <div class="toggle-card-desc">
+            Nearby pincodes usually share the same Reliance Digital store, so
+            one pincode per city is normally enough — you don't need this
+            checked for every pincode in a city.
+          </div>
+        </div>
+      </label>
+    </div>
+
+    <details class="advanced" id="advanced-details">
+      <summary>Use a specific address instead of just the pincode</summary>
+      <p class="hint">
+        Only needed if this pincode covers more than one delivery zone — most
+        pincodes don't. If searching the bare pincode brings up several
+        different area suggestions on Blinkit/Zepto, type a fuller address
+        here instead (street or area name + pincode) so the right one gets
+        picked every time.
+      </p>
+      <input type="text" id="f-searchText" placeholder="e.g. Kadugodi Whitefield 560067" />
+    </details>
+
+    <div class="dialog-actions">
+      <button type="button" class="secondary" id="dialog-cancel">Cancel</button>
+      <button type="submit" class="primary" id="dialog-save">Add pincode</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast"></div>
 
 <script>
   const API = "/api/pincodes";
   let entries = [];
-  let editingId = null;
+  let editingId = null; // null while adding, set to an id while editing
+  let searchQuery = "";
+
+  const dialog = document.getElementById("pincode-dialog");
+  const form = document.getElementById("pincode-form");
+
+  // ---------- small helpers ----------
 
   function showError(message) {
-    const el = document.getElementById("error-banner");
+    const banner = document.getElementById("error-banner");
     if (!message) {
-      el.style.display = "none";
-      el.textContent = "";
+      banner.style.display = "none";
       return;
     }
+    document.getElementById("error-text").textContent = message;
+    banner.style.display = "flex";
+  }
+
+  let toastTimer = null;
+  function showToast(message) {
+    const el = document.getElementById("toast");
     el.textContent = message;
-    el.style.display = "block";
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 2600);
   }
 
   async function api(method, path, body) {
@@ -217,66 +353,81 @@
     return data;
   }
 
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ---------- summary + table ----------
+
   function renderSummary() {
     const qc = entries.filter((e) => e.quickCommerce).length;
     const rd = entries.filter((e) => e.relianceDigital).length;
     document.getElementById("summary").innerHTML =
-      `<span><strong>${entries.length}</strong> pincodes tracked</span>` +
-      `<span><strong>${qc}</strong> in quick-commerce (Blinkit/Zepto/Instamart)</span>` +
-      `<span><strong>${rd}</strong> in Reliance Digital</span>`;
+      `<strong>${entries.length}</strong> pincode${entries.length === 1 ? "" : "s"} tracked ` +
+      `&nbsp;·&nbsp; <strong>${qc}</strong> on delivery apps &nbsp;·&nbsp; <strong>${rd}</strong> on Reliance Digital`;
   }
 
-  function tagHtml(on, label) {
-    return `<span class="tag ${on ? "on" : ""}">${on ? "✓" : "—"} ${label}</span>`;
+  function badgesHtml(entry) {
+    const badges = [];
+    badges.push(
+      entry.quickCommerce
+        ? `<span class="badge on">🛵 Delivery apps</span>`
+        : `<span class="badge">🛵 Delivery apps — off</span>`
+    );
+    badges.push(
+      entry.relianceDigital
+        ? `<span class="badge on">🏬 Reliance Digital</span>`
+        : `<span class="badge">🏬 Reliance Digital — off</span>`
+    );
+    if (!entry.quickCommerce && !entry.relianceDigital) {
+      badges.push(`<span class="badge warn">⚠ not checked anywhere</span>`);
+    }
+    return `<div class="badges">${badges.join("")}</div>`;
+  }
+
+  function filteredEntries() {
+    if (!searchQuery) return entries;
+    const q = searchQuery.toLowerCase();
+    return entries.filter((e) => e.city.toLowerCase().includes(q) || e.pincode.includes(q));
   }
 
   function renderRows() {
     const tbody = document.getElementById("rows");
+    const emptyState = document.getElementById("empty-state");
+    const visible = filteredEntries();
     tbody.innerHTML = "";
-    document.getElementById("empty-state").style.display = entries.length === 0 ? "block" : "none";
 
-    for (const entry of entries) {
-      const tr = document.createElement("tr");
-
-      if (editingId === entry.id) {
-        tr.classList.add("row-editing");
-        tr.innerHTML = `
-          <td><input type="text" class="edit-pincode" value="${escapeAttr(entry.pincode)}" maxlength="6" /></td>
-          <td><input type="text" class="edit-city" value="${escapeAttr(entry.city)}" /></td>
-          <td><input type="text" class="edit-searchText" value="${escapeAttr(entry.searchText || "")}" /></td>
-          <td class="checkbox-cell"><input type="checkbox" class="edit-quickCommerce" ${entry.quickCommerce ? "checked" : ""} /></td>
-          <td class="checkbox-cell"><input type="checkbox" class="edit-relianceDigital" ${entry.relianceDigital ? "checked" : ""} /></td>
-          <td class="actions">
-            <button class="primary save-btn">Save</button>
-            <button class="secondary cancel-btn">Cancel</button>
-          </td>
-        `;
-        tr.querySelector(".save-btn").addEventListener("click", () => saveEdit(entry.id, tr));
-        tr.querySelector(".cancel-btn").addEventListener("click", () => { editingId = null; renderRows(); });
-      } else {
-        tr.innerHTML = `
-          <td class="mono">${escapeHtml(entry.pincode)}</td>
-          <td>${escapeHtml(entry.city)}</td>
-          <td class="muted">${entry.searchText ? escapeHtml(entry.searchText) : "<em>uses pincode</em>"}</td>
-          <td>${tagHtml(entry.quickCommerce, "QC")}</td>
-          <td>${tagHtml(entry.relianceDigital, "RD")}</td>
-          <td class="actions">
-            <button class="secondary edit-btn">Edit</button>
-            <button class="danger delete-btn">Delete</button>
-          </td>
-        `;
-        tr.querySelector(".edit-btn").addEventListener("click", () => { editingId = entry.id; renderRows(); });
-        tr.querySelector(".delete-btn").addEventListener("click", () => deleteEntry(entry.id, entry));
+    if (visible.length === 0) {
+      emptyState.style.display = "block";
+      emptyState.innerHTML = entries.length === 0
+        ? `No pincodes yet.<br><button class="primary" id="empty-add-btn">+ Add your first pincode</button>`
+        : `No pincodes match "${escapeHtml(searchQuery)}".`;
+      if (entries.length === 0) {
+        document.getElementById("empty-add-btn").addEventListener("click", () => openDialog("add"));
       }
+      return;
+    }
+    emptyState.style.display = "none";
 
+    for (const entry of visible) {
+      const tr = document.createElement("tr");
+      const addressNote = entry.searchText
+        ? `<span class="address-note">using address: ${escapeHtml(entry.searchText)}</span>`
+        : "";
+      tr.innerHTML = `
+        <td class="mono">${escapeHtml(entry.pincode)}</td>
+        <td class="city-cell">${escapeHtml(entry.city)}${addressNote}</td>
+        <td>${badgesHtml(entry)}</td>
+        <td class="actions">
+          <button class="secondary small edit-btn">Edit</button>
+          <button class="danger small delete-btn">Delete</button>
+        </td>
+      `;
+      tr.querySelector(".edit-btn").addEventListener("click", () => openDialog("edit", entry));
+      tr.querySelector(".delete-btn").addEventListener("click", () => deleteEntry(entry));
       tbody.appendChild(tr);
     }
   }
-
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  }
-  function escapeAttr(value) { return escapeHtml(value); }
 
   async function loadEntries() {
     entries = await api("GET", API);
@@ -285,58 +436,80 @@
     renderRows();
   }
 
-  async function saveEdit(id, rowEl) {
+  // ---------- add/edit dialog ----------
+
+  function openDialog(mode, entry) {
+    editingId = mode === "edit" ? entry.id : null;
+    showError(null);
+
+    document.getElementById("dialog-title").textContent = mode === "edit" ? "Edit pincode" : "Add a pincode";
+    document.getElementById("dialog-save").textContent = mode === "edit" ? "Save changes" : "Add pincode";
+
+    document.getElementById("f-pincode").value = entry ? entry.pincode : "";
+    document.getElementById("f-city").value = entry ? entry.city : "";
+    document.getElementById("f-searchText").value = entry && entry.searchText ? entry.searchText : "";
+    document.getElementById("f-quickCommerce").checked = entry ? entry.quickCommerce : true;
+    document.getElementById("f-relianceDigital").checked = entry ? entry.relianceDigital : false;
+    document.getElementById("advanced-details").open = Boolean(entry && entry.searchText);
+
+    dialog.showModal();
+    document.getElementById("f-pincode").focus();
+  }
+
+  function closeDialog() {
+    dialog.close();
+    form.reset();
+  }
+
+  async function submitDialog(event) {
+    event.preventDefault();
     const body = {
-      pincode: rowEl.querySelector(".edit-pincode").value.trim(),
-      city: rowEl.querySelector(".edit-city").value.trim(),
-      searchText: rowEl.querySelector(".edit-searchText").value.trim(),
-      quickCommerce: rowEl.querySelector(".edit-quickCommerce").checked,
-      relianceDigital: rowEl.querySelector(".edit-relianceDigital").checked,
+      pincode: document.getElementById("f-pincode").value.trim(),
+      city: document.getElementById("f-city").value.trim(),
+      searchText: document.getElementById("f-searchText").value.trim(),
+      quickCommerce: document.getElementById("f-quickCommerce").checked,
+      relianceDigital: document.getElementById("f-relianceDigital").checked,
     };
+
     try {
       showError(null);
-      await api("PUT", `${API}/${encodeURIComponent(id)}`, body);
-      editingId = null;
+      if (editingId) {
+        await api("PUT", `${API}/${encodeURIComponent(editingId)}`, body);
+        showToast(`Saved ${body.city} ${body.pincode}`);
+      } else {
+        await api("POST", API, body);
+        showToast(`Added ${body.city} ${body.pincode}`);
+      }
+      closeDialog();
       await loadEntries();
     } catch (err) {
       showError(err.message);
     }
   }
 
-  async function deleteEntry(id, entry) {
-    if (!confirm(`Delete ${entry.city} ${entry.pincode}? This can't be undone here (though it's still in git history).`)) return;
+  async function deleteEntry(entry) {
+    if (!confirm(`Delete ${entry.city} ${entry.pincode}? It will stop being checked. (It stays in git history if you need to bring it back.)`)) return;
     try {
       showError(null);
-      await api("DELETE", `${API}/${encodeURIComponent(id)}`);
+      await api("DELETE", `${API}/${encodeURIComponent(entry.id)}`);
+      showToast(`Deleted ${entry.city} ${entry.pincode}`);
       await loadEntries();
     } catch (err) {
       showError(err.message);
     }
   }
 
-  async function addEntry() {
-    const body = {
-      pincode: document.getElementById("add-pincode").value.trim(),
-      city: document.getElementById("add-city").value.trim(),
-      searchText: document.getElementById("add-searchText").value.trim(),
-      quickCommerce: document.getElementById("add-quickCommerce").checked,
-      relianceDigital: document.getElementById("add-relianceDigital").checked,
-    };
-    try {
-      showError(null);
-      await api("POST", API, body);
-      document.getElementById("add-pincode").value = "";
-      document.getElementById("add-city").value = "";
-      document.getElementById("add-searchText").value = "";
-      document.getElementById("add-quickCommerce").checked = true;
-      document.getElementById("add-relianceDigital").checked = false;
-      await loadEntries();
-    } catch (err) {
-      showError(err.message);
-    }
-  }
+  // ---------- wiring ----------
 
-  document.getElementById("add-submit").addEventListener("click", addEntry);
+  document.getElementById("open-add").addEventListener("click", () => openDialog("add"));
+  document.getElementById("dialog-cancel").addEventListener("click", closeDialog);
+  document.getElementById("error-dismiss").addEventListener("click", () => showError(null));
+  form.addEventListener("submit", submitDialog);
+  document.getElementById("search-box").addEventListener("input", (e) => {
+    searchQuery = e.target.value.trim();
+    renderRows();
+  });
+
   loadEntries().catch((err) => showError(err.message));
 </script>
 </body>
