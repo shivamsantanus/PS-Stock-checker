@@ -446,5 +446,29 @@
     "searchText": "Chikkabellandur Sarjapura 560035",
     "quickCommerce": true,
     "relianceDigital": false
+  },
+  {
+    "id": "560051",
+    "pincode": "560051",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false
+  },
+  {
+    "id": "560001",
+    "pincode": "560001",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false
+  },
+  {
+    "id": "560046",
+    "pincode": "560046",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false
   }
 ]
