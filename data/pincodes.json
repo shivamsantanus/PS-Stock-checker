@@ -108,5 +108,35 @@
     "relianceDigital": false,
     "lat": 12.915549700000001,
     "lon": 77.51346989999999
+  },
+  {
+    "id": "560011",
+    "pincode": "560011",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false,
+    "lat": 12.933673599999999,
+    "lon": 77.5899649
+  },
+  {
+    "id": "560025",
+    "pincode": "560025",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false,
+    "lat": 12.9662156,
+    "lon": 77.60679979999999
+  },
+  {
+    "id": "560078",
+    "pincode": "560078",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false,
+    "lat": 12.898773,
+    "lon": 77.5764094
   }
 ]
