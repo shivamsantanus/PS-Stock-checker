@@ -1,139 +1,23 @@
 [
   {
-    "id": "560075",
-    "pincode": "560075",
+    "id": "560001",
+    "pincode": "560001",
     "city": "Bangalore",
     "searchText": "",
     "quickCommerce": true,
-    "relianceDigital": true
+    "relianceDigital": true,
+    "lat": 12.9765944,
+    "lon": 77.5992708
   },
   {
-    "id": "560072",
-    "pincode": "560072",
+    "id": "560026",
+    "pincode": "560026",
     "city": "Bangalore",
     "searchText": "",
     "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560062",
-    "pincode": "560062",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560043",
-    "pincode": "560043",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560066",
-    "pincode": "560066",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560064",
-    "pincode": "560064",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560076",
-    "pincode": "560076",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560069",
-    "pincode": "560069",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560078",
-    "pincode": "560078",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560103",
-    "pincode": "560103",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560094",
-    "pincode": "560094",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560037",
-    "pincode": "560037",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560045",
-    "pincode": "560045",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560102",
-    "pincode": "560102",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560057",
-    "pincode": "560057",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560008",
-    "pincode": "560008",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560010",
-    "pincode": "560010",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
+    "relianceDigital": false,
+    "lat": 12.9565222,
+    "lon": 77.5483533
   },
   {
     "id": "560032",
@@ -141,103 +25,39 @@
     "city": "Bangalore",
     "searchText": "",
     "quickCommerce": true,
-    "relianceDigital": false
+    "relianceDigital": false,
+    "lat": 13.0297992,
+    "lon": 77.6047037
   },
   {
-    "id": "560041",
-    "pincode": "560041",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560024",
-    "pincode": "560024",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560029",
-    "pincode": "560029",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560073",
-    "pincode": "560073",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560048",
-    "pincode": "560048",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560067",
-    "pincode": "560067",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560100",
-    "pincode": "560100",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560114",
-    "pincode": "560114",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "560098",
-    "pincode": "560098",
-    "city": "Bangalore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "kadugodi-560067",
-    "pincode": "560067",
-    "city": "Kadugodi, Whitefield, Bangalore",
-    "searchText": "Kadugodi Whitefield 560067",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "jeevanbhimanagar-560075",
-    "pincode": "560075",
-    "city": "Jeevan Bhima Nagar, LIC Colony, Bangalore",
-    "searchText": "Jeevan Bheema Nagar LIC Colony 560075",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "chikkabellandur-560035",
+    "id": "560035",
     "pincode": "560035",
-    "city": "Chikkabellandur, Sarjapura, Bangalore",
-    "searchText": "Chikkabellandur Sarjapura 560035",
+    "city": "Bangalore",
+    "searchText": "",
     "quickCommerce": true,
-    "relianceDigital": false
+    "relianceDigital": false,
+    "lat": 12.904802199999999,
+    "lon": 77.6821069
+  },
+  {
+    "id": "560039",
+    "pincode": "560039",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false,
+    "lat": 12.951173100000002,
+    "lon": 77.5270689
+  },
+  {
+    "id": "560043",
+    "pincode": "560043",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false,
+    "lat": 13.020626799999999,
+    "lon": 77.64788519999999
   },
   {
     "id": "560051",
@@ -245,22 +65,48 @@
     "city": "Bangalore",
     "searchText": "",
     "quickCommerce": true,
-    "relianceDigital": false
+    "relianceDigital": false,
+    "lat": 12.9888129,
+    "lon": 77.6034894
   },
   {
-    "id": "560001",
-    "pincode": "560001",
+    "id": "560061",
+    "pincode": "560061",
     "city": "Bangalore",
     "searchText": "",
     "quickCommerce": true,
-    "relianceDigital": false
+    "relianceDigital": false,
+    "lat": 12.903725399999999,
+    "lon": 77.53763889999999
   },
   {
-    "id": "560046",
-    "pincode": "560046",
+    "id": "560093",
+    "pincode": "560093",
     "city": "Bangalore",
     "searchText": "",
     "quickCommerce": true,
-    "relianceDigital": false
+    "relianceDigital": false,
+    "lat": 12.9858672,
+    "lon": 77.6713031
+  },
+  {
+    "id": "560102",
+    "pincode": "560102",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false,
+    "lat": 12.911862,
+    "lon": 77.6445923
+  },
+  {
+    "id": "560098",
+    "pincode": "560098",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false,
+    "lat": 12.915549700000001,
+    "lon": 77.51346989999999
   }
 ]

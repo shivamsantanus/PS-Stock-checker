@@ -1,28 +1,49 @@
-import { InStockConfirmation, Target } from "./types";
+// InStockConfirmation is no longer imported here - the Zepto targets were its
+// only users (see the removal note below). The type and the scraper's support
+// for it are intentionally kept in place for the next pincode-gated site that
+// needs a positive "the location really applied" guard.
+import { Platform, Target } from "./types";
 import { PincodeEntry, loadPincodeEntriesSync } from "./pincodeStore";
+import { loadPlatformSwitchesSync } from "./platformStore";
 
 /**
- * Shared IN_STOCK guard for every Zepto target - see InStockConfirmation in
- * types.ts for the full rationale. In short: Zepto's default/no-location view
- * of an out-of-stock product shows the SAME "Add to Cart" CTA as a genuinely
- * in-stock serviceable store, so without these two positive checks the target
- * false-positives whenever the pincode doesn't truly resolve (slow re-render,
- * non-serviceable area, or - the common one - a GitHub Actions runner hitting
- * Zepto from a non-India datacenter IP). Both checks were live-verified
- * 2026-07-14 across an in-stock store (560066/Hagadur), an out-of-stock
- * serviceable store (147002/Patiala), and the default no-location view.
+ * ZEPTO - REMOVED 2026-08-07. Zepto has delisted the PS5 console entirely:
+ * both tracked product pages (pvid ad968d7d-... standard and 4dd0b8da-...
+ * digital) now serve Zepto's 404 page ("The page you're looking for has made
+ * an egg-sit"), and a live catalog search for "playstation" returns only
+ * DualSense controllers, games and third-party accessories - no console in
+ * any form. There is nothing left to point a target at.
+ *
+ * This was not a small amount of dead weight: 66 targets (2 SKUs x 33
+ * pincodes), each one clicking a location picker on a 404 page and burning
+ * the full 30s Playwright timeout before failing, then writing a screenshot
+ * + HTML dump to data/debug/. That is ~34 minutes of every check cycle spent
+ * on pages that cannot ever report stock - the single biggest reason cycles
+ * were being cut off by the CI job timeout before reaching the targets that
+ * do work. data/debug/ held 212 Zepto failure dumps at removal time.
+ *
+ * TO RE-ADD IF ZEPTO RELISTS: the scraping approach itself was sound and is
+ * preserved here, since nothing about it was wrong - only the products
+ * vanished. Zepto's location picker DOES respond to headless automation:
+ * click `[data-testid='user-address']` to open the modal, fill
+ * `[data-testid='address-search-input'] input`, then click the first
+ * `[data-testid='address-search-item']` and wait ~7000ms - that generous
+ * wait was load-bearing, because the DOM keeps showing the STALE default
+ * "Add to Cart" for ~2.2s after the click and a shorter wait produced real
+ * false alerts (live-verified 2026-07-08). The buy-box selector was the
+ * hashed CSS-module class `.KQfnF.ckhcV`, matching "add to cart" for in
+ * stock and "notify me"/"out of stock" against it.
+ *
+ * Two IN_STOCK confirmation guards were also required (see InStockConfirmation
+ * in types.ts) and would be needed again, because Zepto's default/no-location
+ * view of an out-of-stock product shows the SAME "Add to Cart" CTA as a
+ * genuinely in-stock store: (1) `[data-testid='user-address']` must no longer
+ * read "select location", proving the picker applied, and (2) `header` must
+ * match /\d+\s*min/, proving a serviceable dark store actually resolved -
+ * Zepto renders a delivery ETA for any serviceable location but never on the
+ * unresolved view. Both were live-verified 2026-07-14 across an in-stock
+ * store, an out-of-stock serviceable store, and the default view.
  */
-const ZEPTO_IN_STOCK_CONFIRMATIONS: InStockConfirmation[] = [
-  // 1. The location picker was actually applied: the header address stops
-  //    reading the default "Select Location" prompt once a real address is set.
-  { selector: "[data-testid='user-address']", rejectAny: ["select location"] },
-  // 2. A serviceable dark store resolved: Zepto renders a delivery ETA
-  //    ("N minutes") in the header for ANY serviceable location - in-stock or
-  //    out-of-stock alike - but never on the unresolved/default view. Its
-  //    presence is what separates a real per-pincode read from the default
-  //    "Add to Cart" fallback that caused the false alerts.
-  { selector: "header", matches: "\\d+\\s*min" },
-];
 
 /**
  * Builds the JSON body Croma's own PDP sends to its OMS delivery-promise
@@ -91,6 +112,7 @@ const CROMA_OMS_SUBSCRIPTION_KEY = "1131858141634e2abe2efb2b3a2a2a5d";
 function cromaTarget(opts: { idSuffix: string; label: string; itemId: string; productUrl: string }): Target {
   return {
     id: `croma-${opts.idSuffix}`,
+    platform: "croma",
     label: `Croma - ${opts.label}`,
     url: "https://api.croma.com/inventory/oms/v2/tms/details-pwa/",
     displayUrl: opts.productUrl,
@@ -188,6 +210,7 @@ function relianceDigitalTarget(opts: {
 }): Target {
   return {
     id: `reliancedigital-${opts.idSuffix}-${opts.pincode}`,
+    platform: "reliancedigital",
     label: `Reliance Digital - ${opts.city} ${opts.pincode} (${opts.label})`,
     url: `https://www.reliancedigital.in/api/service/application/catalog/v2.0/products/${opts.slug}/sizes/OS/price/?pincode=${opts.pincode}`,
     displayUrl: `https://www.reliancedigital.in/product/${opts.slug}`,
@@ -238,6 +261,7 @@ function relianceDigitalTarget(opts: {
 function relianceDigitalPreOrderTarget(opts: { idSuffix: string; label: string; slug: string }): Target {
   return {
     id: `reliancedigital-preorder-${opts.idSuffix}`,
+    platform: "reliancedigital",
     label: `Reliance Digital - ${opts.label} (pre-order watch)`,
     url: `https://www.reliancedigital.in/api/service/application/catalog/v1.0/products/${opts.slug}/`,
     displayUrl: `https://www.reliancedigital.in/product/${opts.slug}`,
@@ -310,6 +334,7 @@ function relianceDigitalPreOrderTarget(opts: { idSuffix: string; label: string; 
 function gamesTheShopTarget(opts: { idSuffix: string; label: string; productId: string }): Target {
   return {
     id: `gamestheshop-${opts.idSuffix}`,
+    platform: "gamestheshop",
     label: `Games The Shop - ${opts.label}`,
     url: `https://green-api.gamestheshop.com/storefront/products/${opts.productId}`,
     displayUrl: `https://www.gamestheshop.com/product/${opts.productId}`,
@@ -331,21 +356,141 @@ function gamesTheShopTarget(opts: { idSuffix: string; label: string; productId: 
 }
 
 /**
+ * Builds one Amazon.in product target - all of them read the same
+ * `#availability` buy-box line, live-verified 2026-08-07 to be present and
+ * meaningful in EVERY state on amazon.in:
+ *   in stock     -> "In stock" (verified on an in-stock listing, DualSense
+ *                   B08GZ6QNTC, at the same moment every PS5 console listing
+ *                   read unavailable - so this is a real live contrast, not a
+ *                   guess about what the in-stock template says)
+ *   out of stock -> "Currently unavailable. We don't know when or if this
+ *                   item will be back in stock."
+ *   pre-order    -> "This item will be released on <date>. Pre-order now."
+ *                   (verified on GTA VI, B0H6X8VNQC)
+ *
+ * WHY THIS IS A FACTORY NOW - THE MISSED-RESTOCK BUG (found 2026-08-07 after
+ * the user reported Amazon restocking repeatedly with no alert ever firing):
+ * this file tracked exactly ONE Amazon ASIN, B08FV5GC28 - the 2020 launch
+ * console (CFI-1008A01R). That listing is retired: it has read "Currently
+ * unavailable. We don't know when or if this item will be back in stock."
+ * continuously since this checker started (state.json shows its status never
+ * once changed from OUT_OF_STOCK between 2026-07-08 and 2026-08-03), and it
+ * is NOT the listing Amazon India actually restocks. Nothing was broken in
+ * the scraper - it was faithfully reporting a dead page.
+ *
+ * The live console listings were found 2026-08-07 by walking Amazon's own
+ * PlayStation 5 > Consoles bestseller node (/gp/bestsellers/videogames/
+ * 20904636031/) - NOT by keyword search, which is worth remembering: a
+ * search for "ps5 slim" / "playstation 5 pro" on amazon.in returns almost
+ * nothing but accessories, because Amazon deprioritises out-of-stock console
+ * listings out of search results entirely. The bestseller node still ranks
+ * them, so it is the reliable way to re-discover ASINs if Sony relists.
+ *
+ * All the ASINs below read "Currently unavailable" at wiring time (2026-08-07)
+ * - which is the genuine state of PS5 consoles on amazon.in right now, and
+ * also why no MRP/price is visible on any of them (Amazon hides the price
+ * block entirely on an unavailable listing).
+ *
+ * NO PS5 PRO LISTING EXISTS to track: checked both pages of the Consoles
+ * bestseller node plus targeted searches - amazon.in has no Sony-sold
+ * PlayStation 5 Pro console listing at all, only third-party Pro accessories
+ * (stands, cases, cooling docks). If Sony lists one, add it here.
+ *
+ * Location caveat (unchanged, see the IMPORTANT note above TARGETS): Amazon
+ * resolves delivery location from the request IP and its picker can't be
+ * driven headless - but console availability on amazon.in is a national
+ * "is this orderable at all" signal, so that only affects the delivery ETA,
+ * not the in/out-of-stock read these targets make.
+ */
+function amazonTarget(opts: { idSuffix: string; label: string; asin: string }): Target {
+  return {
+    id: `amazon-${opts.idSuffix}`,
+    platform: "amazon",
+    // "location = wherever this script runs from" kept in every label so an
+    // alert is never mistaken for a per-city read - see the note above.
+    label: `Amazon.in - ${opts.label} (location = wherever this script runs from)`,
+    url: `https://www.amazon.in/dp/${opts.asin}`,
+    strategy: "dom",
+    selector: "#availability",
+    // Live-verified 2026-07-16 against a real active pre-order listing (GTA
+    // VI, same #availability selector), re-confirmed 2026-08-07: a
+    // not-yet-released item reads "This item will be released on <date>.
+    // Pre-order now." Dormant for already-released console SKUs, but free to
+    // check and would catch a pre-order window on a newly listed SKU/bundle.
+    comingSoonValues: ["will be released on", "pre-order now"],
+    outOfStockValues: ["currently unavailable", "out of stock"],
+    // Deliberately only the phrases observed live - "Only 2 left in stock"
+    // and "Only 1 left in stock - order soon" both contain "in stock", so
+    // they are already covered without guessing at extra templates.
+    inStockValues: ["in stock", "few left", "hurry"],
+  };
+}
+
+/**
+ * Every Amazon.in listing Sony sells a PS5 console through, from the
+ * PlayStation 5 > Consoles bestseller node (see amazonTarget above for how
+ * this list was built and how to refresh it). Bundles are included
+ * deliberately - a console restock on amazon.in frequently lands on a bundle
+ * SKU (Fortnite/ASTRO BOT/FC 26/COD) while the plain console listing stays
+ * unavailable, so tracking only the two plain SKUs would still miss stock.
+ */
+const AMAZON_PS5_LISTINGS: { idSuffix: string; label: string; asin: string }[] = [
+  // --- Plain console SKUs ---
+  { idSuffix: "ps5-slim-disc", label: "PS5 Slim Console (Disc)", asin: "B0CY5HVDS2" },
+  { idSuffix: "ps5-slim-digital", label: "PS5 Slim Digital Edition Console", asin: "B0CY5QW186" },
+  // Separate, newer listing for the same Slim console, sold by "Sony India
+  // Private Limited-DL" rather than the Sony seller account behind
+  // B0CY5HVDS2 - ranked #2 in the Consoles bestseller node at wiring time,
+  // i.e. it is actively selling, so it gets its own target.
+  { idSuffix: "ps5-slim-sony-india", label: "PS5 Slim Console (Sony India listing)", asin: "B0GNMKL3VP" },
+  // Older but still highly-ranked "Sony PS5 Console" listing (1,626 ratings).
+  { idSuffix: "ps5-console-legacy", label: "PS5 Console (legacy listing)", asin: "B0BRCP72X8" },
+  // The originally-tracked 2020 launch model (CFI-1008A01R, ASIN B08FV5GC28)
+  // was REMOVED 2026-08-07 as a discontinued console generation: it has been
+  // permanently unavailable for the entire life of this checker (see the
+  // missed-restock note above) and only current-generation SKUs are tracked
+  // now. To restore it as a relist tripwire, re-add:
+  //   { idSuffix: "ps5-launch-cfi-1008a01r", label: "PS5 Console CFI-1008A01R (2020 launch listing)", asin: "B08FV5GC28" },
+
+  // --- Console bundles (each is a full console, not an accessory) ---
+  { idSuffix: "ps5-two-controllers-bundle", label: "PS5 Console + 2 DualSense Bundle", asin: "B0DT9MQQC1" },
+  { idSuffix: "ps5-disc-fortnite-bundle", label: "PS5 Slim Disc - Fortnite Bundle", asin: "B0DN1QD11J" },
+  { idSuffix: "ps5-digital-fortnite-bundle", label: "PS5 Slim Digital - Fortnite Bundle", asin: "B0DN1QNDWC" },
+  { idSuffix: "ps5-disc-fortnite-chaos-bundle", label: "PS5 Console - Fortnite Flowering Chaos Bundle", asin: "B0G66KXDKQ" },
+  { idSuffix: "ps5-digital-fortnite-chaos-bundle", label: "PS5 Digital - Fortnite Flowering Chaos Bundle", asin: "B0G65CWFQF" },
+  { idSuffix: "ps5-cod-bundle", label: "PS5 Slim Standard - Call of Duty Bundle", asin: "B0FG835ZCY" },
+  { idSuffix: "ps5-disc-astrobot-bundle", label: "PS5 Slim Disc - ASTRO BOT Bundle", asin: "B0DZHLP255" },
+  { idSuffix: "ps5-digital-astrobot-bundle", label: "PS5 Slim Digital - ASTRO BOT Bundle", asin: "B0DZHNKSFW" },
+  { idSuffix: "ps5-digital-fc26-bundle", label: "PS5 Slim Digital - EA SPORTS FC 26 Bundle", asin: "B0FWJFND2Q" },
+  { idSuffix: "ps5-digital-30th-anniversary", label: "PS5 Digital - 30th Anniversary Limited Edition", asin: "B0DL68YCW9" },
+];
+
+/**
  * Every pincode/address this file tracks now lives in data/pincodes.json,
  * managed via `npm run admin` (browser UI) instead of editing this file -
  * see src/pincodeStore.ts for the schema. Each row's `quickCommerce`/
  * `relianceDigital` flags pick which of the two generators below it feeds:
- * the Reliance Digital list was historically a smaller curated set (one
- * representative pincode per city - nearby pincodes resolve to the same
- * regional store, so checking all of them would just repeat the same answer
- * 3x per SKU), while quick-commerce (Blinkit/Zepto/Instamart) fans out to
- * every pincode since each dark-store zone can genuinely differ.
+ * the Reliance Digital list is a smaller curated set (one representative
+ * pincode per city - nearby pincodes resolve to the same regional store, so
+ * checking all of them would just repeat the same answer per SKU), while
+ * quick-commerce (Blinkit) fans out to every pincode since each dark-store
+ * zone can genuinely differ.
+ *
+ * Exactly one row (560001) carries relianceDigital: true - dropping that flag
+ * from every row would silently take Reliance Digital coverage to zero, since
+ * this filter is the only thing that generates its targets.
  */
 const PINCODE_ENTRIES = loadPincodeEntriesSync();
 
 /**
- * The 3 Reliance Digital targets (per SKU) for one pincode entry - see the
+ * The 2 Reliance Digital targets (per SKU) for one pincode entry - see the
  * relianceDigitalTarget factory above for the verified per-pincode contract.
+ *
+ * The third SKU, `sony-playstation-5-digital-edition-console` (the original
+ * pre-Slim Digital Edition), was REMOVED 2026-08-07: it is a discontinued
+ * console generation, and its live price probe confirmed it as the oldest
+ * price tier still listed anywhere (MRP 44,990 vs 54,990/49,990 for the two
+ * Slim SKUs kept below). Only current-generation MRPs are tracked now.
  */
 function relianceDigitalPincodeTargets(entry: PincodeEntry): Target[] {
   const { pincode, city } = entry;
@@ -364,20 +509,15 @@ function relianceDigitalPincodeTargets(entry: PincodeEntry): Target[] {
       pincode,
       city,
     }),
-    relianceDigitalTarget({
-      idSuffix: "ps5-digital-edition",
-      label: "PS5 Digital Edition Console",
-      slug: "sony-playstation-5-digital-edition-console",
-      pincode,
-      city,
-    }),
   ];
 }
 
 /**
- * The 4 quick-commerce targets (Blinkit x2 SKUs, Zepto x2 SKUs) for one
- * pincode entry. Instamart is NOT per-pincode here - see the standalone
- * instamart-ps5-national target below for why. Uses `entry.searchText`
+ * The 2 quick-commerce targets (Blinkit, x2 SKUs) for one pincode entry.
+ * Blinkit is the ONLY quick-commerce platform left here - Zepto delisted the
+ * PS5 console entirely and Swiggy Instamart is unreachable headless; both
+ * were removed 2026-08-07, see their notes above and below. Uses
+ * `entry.searchText`
  * instead of the bare pincode when set - needed because a bare-pincode
  * search on Zepto/Blinkit can resolve ambiguously to more than one
  * dark-store zone (live-verified case: pincode 560067/Kadugodi returned
@@ -387,124 +527,162 @@ function relianceDigitalPincodeTargets(entry: PincodeEntry): Target[] {
  * rows with a custom address get their own distinct target ids alongside a
  * plain-pincode row for the same pincode.
  */
-function quickCommercePincodeTargets(entry: PincodeEntry): Target[] {
+/**
+ * The PS5 SKUs Blinkit lists. `prid` is both the product id in the page URL
+ * and the `product_id` the availability API keys its stock fields on.
+ */
+const BLINKIT_PS5_SKUS = [
+  {
+    idPrefix: "blinkit-ps5",
+    labelSuffix: "",
+    prid: "779739",
+    slug: "playstation-5-digital-edition-gaming-console-white",
+  },
+  {
+    // Added 2026-07-29 - newer console revision (CFI-2116A01Y, Standard
+    // Edition), a different listing from the Digital Edition above (added
+    // alongside it, not replacing it, so both stay tracked).
+    idPrefix: "blinkit-ps5-cfi-2116a01y",
+    labelSuffix: " (CFI-2116A01Y Standard Edition)",
+    prid: "763266",
+    slug: "playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white",
+  },
+] as const;
+
+type BlinkitSku = (typeof BLINKIT_PS5_SKUS)[number];
+
+/**
+ * Blinkit availability WITHOUT a browser page render or a location picker -
+ * reverse-engineered from the PDP's own traffic and live-verified
+ * 2026-08-07.
+ *
+ *   POST /v1/layout/product/<prid>   headers: lat, lon, app_client
+ *
+ * No auth, no cookies, no pincode text - the delivery location is purely the
+ * lat/lon pair, which is why quick-commerce rows carry `lat`/`lon`
+ * (backfilled by `npm run resolve-latlon` from Blinkit's own geocoder, so
+ * the coordinate matches what its picker would have set).
+ *
+ * Verified per-location, not a national flag: at one moment the DualSense
+ * controller (a product that was actually in stock, so differences show)
+ * read inventory 4 in Bangalore, 1 in Delhi and 0 in Mumbai. This is a real
+ * per-coordinate signal - unlike the old Instamart targets, which faked
+ * per-pincode checks and were removed.
+ *
+ * WHY BOTH FIELDS: `inventory` alone false-positives. The same live run read
+ * Delhi as inventory 1 but is_sold_out TRUE - a non-zero count that is not
+ * actually buyable. So `is_sold_out` is the authoritative CTA signal and a
+ * positive `inventory` is required as corroboration; either one failing
+ * means out of stock. Both are checked as delimited `field=value;` tokens
+ * (see JsonFind) so "inventory=0;" can't also match inventory 100.
+ *
+ * COMING SOON - the field DOES exist, found 2026-08-07 by diffing this API
+ * path against the old DOM path it replaced. The two disagreed on 10 of 20
+ * targets: the DOM path read COMING_SOON for the CFI-2116A01Y SKU (Blinkit's
+ * "Coming soon" badge) where the API path read OUT_OF_STOCK. The DOM path was
+ * right - dropping to the safe default would have silently killed every
+ * coming-soon alert this checker fires from Blinkit, which is the earliest
+ * warning a restock is being staged.
+ *
+ * The response does carry a "Coming soon" product_badges entry, but badges
+ * live on a sibling snippet object with no product_id on it - unusable for
+ * jsonFind, which flattens ONE product object. `product_state` is the right
+ * field: a scalar on the product object itself, sitting beside is_sold_out.
+ * Live-verified 2026-08-07 across 24 product objects in a single response
+ * (the tracked SKU plus every recommendation-carousel item):
+ *   "available"    + is_sold_out=false  -> orderable now      (x22)
+ *   "coming_soon"  + is_sold_out=true   -> pre-launch badge   (x2, the
+ *                                          CFI-2116A01Y SKU)
+ *   "out_of_stock" + is_sold_out=true   -> genuinely sold out (the Digital
+ *                                          Edition SKU, same moment)
+ * comingSoonValues is checked before outOfStockValues (see resolveStatus), so
+ * a coming_soon SKU routes to COMING_SOON even though is_sold_out is true -
+ * exactly what the DOM path did.
+ */
+function blinkitApiTarget(entry: PincodeEntry, sku: BlinkitSku): Target {
+  const { id, pincode, city } = entry;
+  return {
+    id: `${sku.idPrefix}-${id}`,
+    platform: "blinkit",
+    label: `Blinkit - ${city} ${pincode}${sku.labelSuffix}`,
+    url: `https://blinkit.com/v1/layout/product/${sku.prid}`,
+    // The raw endpoint is useless to a human racing a restock - link the
+    // real product page instead.
+    displayUrl: `https://blinkit.com/prn/${sku.slug}/prid/${sku.prid}`,
+    // NOT "api": this endpoint is behind Cloudflare bot management that
+    // rejects Node's TLS fingerprint outright (axios/undici/Playwright's
+    // APIRequestContext all 403 while curl and a real page both 200) - see
+    // CheckStrategy in types.ts for the full finding.
+    strategy: "browser-api",
+    method: "POST",
+    requestHeaders: {
+      lat: String(entry.lat),
+      lon: String(entry.lon),
+      app_client: "consumer_web",
+    },
+    requestBody: {},
+    // Located by product id, never by position: this response repeats the
+    // same stock fields on ~90 objects (cart stubs, analytics, and every
+    // "you might also like" item), so a fixed dot-path would be one layout
+    // change away from silently reading a different product.
+    jsonFind: { where: "product_id", equals: sku.prid, select: ["is_sold_out", "inventory", "product_state"] },
+    // Checked first (see resolveStatus), so a pre-launch SKU reads
+    // COMING_SOON instead of being swallowed by is_sold_out=true below -
+    // this is what the DOM path did and what the API path lost until
+    // 2026-08-07. See the product_state findings in the doc comment above.
+    comingSoonValues: ["product_state=coming_soon;"],
+    outOfStockValues: ["is_sold_out=true;", "inventory=0;"],
+    inStockValues: ["is_sold_out=false;"],
+  };
+}
+
+/**
+ * The original browser/location-picker Blinkit check, kept ONLY as the
+ * fallback for rows with no resolved coordinate (run `npm run resolve-latlon`
+ * to move a row onto the ~20x faster API path above). The picker itself is
+ * verified working - original 2026-07-08 live test on pincode 110001 - but
+ * it costs a full page render plus ~5s of scripted waits per check, and
+ * driving a UI is far more bot-detectable than the JSON call.
+ */
+function blinkitDomTarget(entry: PincodeEntry, sku: BlinkitSku): Target {
   const { id, pincode, city } = entry;
   const locationValue = entry.searchText || pincode;
+  return {
+    id: `${sku.idPrefix}-${id}`,
+    platform: "blinkit",
+    label: `Blinkit - ${city} ${pincode}${sku.labelSuffix}`,
+    url: `https://blinkit.com/prn/${sku.slug}/prid/${sku.prid}`,
+    strategy: "dom",
+    preActions: [
+      // Opens the "Change Location" modal from the header.
+      { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
+      { action: "fill", selector: "input[name='select-locality']", value: locationValue, waitAfterMs: 2000 },
+      // Clicks the first suggestion in the results list.
+      { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
+    ],
+    // Scoped to the product's own info panel (breadcrumb/title/price/stock),
+    // NOT the whole page - this product page also renders "Top 10 products
+    // in this category" and "People also bought" carousels full of OTHER
+    // products' "ADD" buttons, so a page-wide selector would false-positive
+    // on those. `ProductWrapperRightSection` is a styled-components class
+    // that wraps only the real product's info column.
+    selector: "div[class*='ProductWrapperRightSection']",
+    // Confirmed live 2026-07-12 (Bhubaneswar 751012, PS5 Digital Edition):
+    // Blinkit pre-lists some SKUs as orderable-later with this exact badge.
+    comingSoonValues: ["coming soon"],
+    outOfStockValues: ["out of stock"],
+    inStockValues: ["add"],
+  };
+}
 
-  return [
-    {
-      // Blinkit's location picker is VERIFIED WORKING (see original
-      // 2026-07-08 live test on pincode 110001) - typing a pincode into the
-      // "Change Location" modal returns real suggestions, and clicking one
-      // actually updates the delivery address and re-renders availability.
-      id: `blinkit-ps5-${id}`,
-      label: `Blinkit - ${city} ${pincode}`,
-      url: "https://blinkit.com/prn/playstation-5-digital-edition-gaming-console-white/prid/779739",
-      strategy: "dom",
-      preActions: [
-        // Opens the "Change Location" modal from the header.
-        { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-        { action: "fill", selector: "input[name='select-locality']", value: locationValue, waitAfterMs: 2000 },
-        // Clicks the first suggestion in the results list.
-        { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-      ],
-      // Scoped to the product's own info panel (breadcrumb/title/price/stock),
-      // NOT the whole page - this product page also renders "Top 10 products
-      // in this category" and "People also bought" carousels full of OTHER
-      // products' "ADD" buttons, so a page-wide selector would false-positive
-      // on those. `ProductWrapperRightSection` is a styled-components class
-      // that wraps only the real product's info column.
-      selector: "div[class*='ProductWrapperRightSection']",
-      // Confirmed live 2026-07-12 (Bhubaneswar 751012, PS5 Digital Edition):
-      // Blinkit pre-lists some SKUs as orderable-later with this exact badge.
-      comingSoonValues: ["coming soon"],
-      outOfStockValues: ["out of stock"],
-      inStockValues: ["add"],
-    },
-    {
-      // Added 2026-07-29 - newer console revision (CFI-2116A01Y, Standard
-      // Edition), different product/prid from the entry above (added
-      // alongside it, not replacing it, so both listings stay tracked).
-      // Same location-picker flow and selectors - Blinkit's per-product page
-      // layout is consistent across SKUs.
-      id: `blinkit-ps5-cfi-2116a01y-${id}`,
-      label: `Blinkit - ${city} ${pincode} (CFI-2116A01Y Standard Edition)`,
-      url: "https://blinkit.com/prn/playstation-cfi-2116a01y-5-gaming-console-standard-edition-e-chassis-white/prid/763266",
-      strategy: "dom",
-      preActions: [
-        { action: "click", selector: "div[class*='LocationBar__Subtitle']" },
-        { action: "fill", selector: "input[name='select-locality']", value: locationValue, waitAfterMs: 2000 },
-        { action: "click", selector: "div[class*='LocationSearchList__LocationListContainer']", waitAfterMs: 3000 },
-      ],
-      selector: "div[class*='ProductWrapperRightSection']",
-      comingSoonValues: ["coming soon"],
-      outOfStockValues: ["out of stock"],
-      inStockValues: ["add"],
-    },
-    {
-      // VERIFIED live 2026-07-08 against the real product page below.
-      // Zepto's location picker DOES respond to headless automation, same
-      // as Blinkit's: opening the address modal via `user-address`, filling
-      // the search box, and clicking the first `address-search-item` result
-      // actually updates delivery location and re-renders availability -
-      // confirmed live by pincode 147002 flipping the CTA from
-      // "Add to Cart" to "Notify Me when back in stock".
-      //
-      // FALSE-POSITIVE FOUND AND FIXED 2026-07-08: a live run reported
-      // IN_STOCK for Gurugram/Bhubaneswar/Dehradun that had already reverted
-      // to OUT_OF_STOCK by the time it was checked manually. Root-caused by
-      // polling the buy-box every 300ms after clicking the address
-      // suggestion: the DOM keeps showing the STALE "Add to Cart" text from
-      // the default/no-pincode view for ~2.2s before Zepto actually
-      // re-fetches and re-renders availability for the new address. The
-      // previous 3500ms waitAfterMs had thin margin over that and could
-      // read mid-transition on a slower connection (e.g. a GitHub Actions
-      // runner). Bumped to 7000ms (~3x the observed transition time) below.
-      id: `zepto-ps5-${id}`,
-      label: `Zepto - ${city} ${pincode}`,
-      url: "https://www.zepto.com/pn/playstation-5-console-standard/pvid/ad968d7d-c5d8-415e-b7d4-58f84ff13076",
-      strategy: "dom",
-      preActions: [
-        // Opens the "Select Location" modal from the header.
-        { action: "click", selector: "[data-testid='user-address']" },
-        { action: "fill", selector: "[data-testid='address-search-input'] input", value: locationValue, waitAfterMs: 2000 },
-        // Clicks the first suggestion in the results list. waitAfterMs is
-        // intentionally generous - see the false-positive note above.
-        { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
-      ],
-      // Scoped to the buy-box only (title/price/CTA) - confirmed NOT to
-      // include the page's global nav/footer, which also lists city names
-      // like "Patiala" and "Gurugram" that would otherwise false-positive
-      // on naive text matching. Like Flipkart's obfuscated classes, this is
-      // a hashed CSS-module class name that may rotate on Zepto redeploys -
-      // re-verify if this target starts erroring out.
-      selector: ".KQfnF.ckhcV",
-      outOfStockValues: ["notify me", "out of stock"],
-      inStockValues: ["add to cart"],
-      inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
-    },
-    {
-      // Same product family/site behavior as the entry above (standard
-      // edition) - selectors, location-picker flow, and the 7000ms
-      // false-positive-avoidance wait are identical, just a different
-      // product page. Confirmed live 2026-07-08 that this page uses the
-      // same buy-box class and correctly flips to "Notify Me when back in
-      // stock" once a pincode is applied.
-      id: `zepto-ps5-digital-${id}`,
-      label: `Zepto - ${city} ${pincode} (Digital Edition)`,
-      url: "https://www.zepto.com/pn/playstation-5-console-digital/pvid/4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
-      strategy: "dom",
-      preActions: [
-        { action: "click", selector: "[data-testid='user-address']" },
-        { action: "fill", selector: "[data-testid='address-search-input'] input", value: locationValue, waitAfterMs: 2000 },
-        { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
-      ],
-      selector: ".KQfnF.ckhcV",
-      outOfStockValues: ["notify me", "out of stock"],
-      inStockValues: ["add to cart"],
-      inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
-    },
-  ];
+function quickCommercePincodeTargets(entry: PincodeEntry): Target[] {
+  // A row only reaches the API path once its coordinate is known; until
+  // then it keeps working the slow way rather than silently dropping out of
+  // the check list.
+  const hasCoordinate = typeof entry.lat === "number" && typeof entry.lon === "number";
+  return BLINKIT_PS5_SKUS.map((sku) =>
+    hasCoordinate ? blinkitApiTarget(entry, sku) : blinkitDomTarget(entry, sku)
+  );
 }
 
 /**
@@ -527,12 +705,20 @@ function quickCommercePincodeTargets(entry: PincodeEntry): Target[] {
  *   reliable target in this file. Sony doesn't sell PS5 hardware through its
  *   own sony.co.in store in India, only through retail partners like this.
  *
- * Amazon.in - CONFIRMED SELECTOR, medium confidence.
- *   `#availability` reliably showed "Currently unavailable." live. Amazon's
- *   location-change modal (`#nav-global-location-popover-link` ->
- *   `#GLUXZipUpdateInput` -> `#GLUXZipUpdate`) would not actually apply a new
- *   pincode under headless Playwright in testing - its bot detection appears
- *   to specifically obstruct that interactive flow.
+ * Amazon.in - CONFIRMED WORKING, high confidence in the READ; the risk here
+ *   is picking the wrong LISTING, not misreading it. `#availability` was
+ *   re-verified live 2026-08-07 to carry a distinct, unambiguous line in all
+ *   three states (in stock / currently unavailable / pre-order) - see the
+ *   amazonTarget factory below. What actually caused a month of missed
+ *   Amazon restocks was tracking a single retired ASIN, so the rule for this
+ *   retailer is: re-check the PlayStation 5 > Consoles BESTSELLER node
+ *   periodically for new/relisted SKUs rather than trusting a fixed URL to
+ *   stay the one Amazon restocks. Amazon's location-change modal
+ *   (`#nav-global-location-popover-link` -> `#GLUXZipUpdateInput` ->
+ *   `#GLUXZipUpdate`) still would not apply a new pincode under headless
+ *   Playwright - its bot detection specifically obstructs that interactive
+ *   flow - but console availability here is national, so that only affects
+ *   the delivery ETA, not the stock read.
  *
  * Flipkart - CONFIRMED WORKING via structured data, high confidence for
  *   "is this in stock anywhere," NOT for "is this deliverable to me."
@@ -598,23 +784,31 @@ function quickCommercePincodeTargets(entry: PincodeEntry): Target[] {
  *     either selector returned contradictory results in testing, picking up
  *     an unrelated carousel item rather than the main product reliably.
  */
-export const TARGETS: Target[] = [
-  {
-    id: "sonycenter-ps5-standard",
-    label: "Sony Center - PS5 Standard Edition",
-    url: "https://shopatsc.com/products/playstation-5-standard-edition.js",
-    strategy: "api",
-    jsonPath: "available",
-    inStockValues: ["true"],
-  },
-  {
-    id: "sonycenter-ps5-digital",
-    label: "Sony Center - PS5 Digital Edition",
-    url: "https://shopatsc.com/products/playstation-5-digital-edition.js",
-    strategy: "api",
-    jsonPath: "available",
-    inStockValues: ["true"],
-  },
+/**
+ * Every target this file knows how to build, before the per-platform on/off
+ * switches are applied. Exported for the admin UI, which needs the counts for
+ * platforms that are currently switched OFF - those are absent from TARGETS by
+ * definition, so it can't count them there. The checker should always use
+ * TARGETS (below), never this.
+ */
+export const buildAllTargets = (entries: PincodeEntry[]): Target[] => [
+  // --- SONY CENTER (shopatsc.com) - REMOVED 2026-08-07. Sony's own retail
+  // chain has stopped selling PS5 consoles online: both tracked Shopify
+  // product endpoints (/products/playstation-5-standard-edition.js and
+  // -digital-edition.js) now return 404, and its whole playstation-5
+  // collection - 67 products pulled live via products.json - contains no
+  // console at all, only console COVERS and accessories. A catalog search
+  // for "ps5 console" returns zero product hits. Nothing to track.
+  //
+  // Ironically this was documented as "the most reliable target in this
+  // file" (a clean Shopify `available: true/false` boolean, no scraping, no
+  // bot detection) - and the read never broke. The retailer simply left the
+  // market. TO RE-ADD: if shopatsc.com relists a console, the Shopify
+  // contract still holds - point an "api" target at
+  // https://shopatsc.com/products/<handle>.js with jsonPath "available" and
+  // inStockValues ["true"]. Find the handle via
+  // https://shopatsc.com/search/suggest.json?q=<query>&resources[type]=product
+  // or /collections/playstation-5/products.json?limit=250.
 
   // --- Games The Shop, added 2026-07-15 - the PlayStation-exclusive retail
   // chain run by Sony's official Indian distributor. National online stock
@@ -632,28 +826,16 @@ export const TARGETS: Target[] = [
     label: "PS5 Slim Console - Digital Edition",
     productId: "0a3c6810-ed3d-4bec-8e98-48a2ed5208fd",
   }),
-  {
-    id: "amazon-national",
-    // IMPORTANT: "national" here means "wherever this script's network
-    // connection resolves to," not a chosen city - see the IMPORTANT note
-    // above this array for why that matters and how to run it correctly.
-    label: "Amazon.in - PS5 console (location = wherever this script runs from)",
-    url: "https://www.amazon.in/Sony-CFI-1008A01R-PlayStation-5-console/dp/B08FV5GC28",
-    strategy: "dom",
-    selector: "#availability",
-    // Live-verified 2026-07-16 against a real active pre-order listing (GTA
-    // VI, same #availability selector): a not-yet-released item reads
-    // "This item will be released on <date>.\nPre-order now." - same
-    // selector already scraped here, so this is free to check even though
-    // it's dormant for the PS5 console itself (already released since 2021,
-    // so #availability will essentially never say this for THIS listing -
-    // only useful if Amazon lists a new not-yet-released PS5 SKU/bundle).
-    comingSoonValues: ["will be released on", "pre-order now"],
-    outOfStockValues: ["currently unavailable", "out of stock"],
-    inStockValues: ["in stock", "few left", "hurry"],
-  },
+  // --- Amazon.in, reworked 2026-08-07 from a single (retired) ASIN to every
+  // listing Sony actually sells a PS5 console through - see the amazonTarget
+  // factory above for the missed-restock post-mortem, the verified
+  // #availability contract, and how the ASIN list was sourced. IMPORTANT:
+  // "location" for these is wherever this script's network connection
+  // resolves to, not a chosen city - see the IMPORTANT note above this array.
+  ...AMAZON_PS5_LISTINGS.map(amazonTarget),
   {
     id: "flipkart-national",
+    platform: "flipkart",
     label: "Flipkart - PS5 console (location = wherever this script runs from)",
     url: "https://www.flipkart.com/sony-playstation5-console-slim-cfi-2008a01x-1024-gb/p/itm89489e2adcd2c",
     strategy: "dom",
@@ -661,35 +843,33 @@ export const TARGETS: Target[] = [
     outOfStockValues: ["schema.org/outofstock"],
     inStockValues: ["schema.org/instock"],
   },
-  {
-    // Was previously fanned out per-pincode (one target per row in
-    // data/pincodes.json) - live-tested 2026-07-08 and confirmed the real
-    // product page has NO location/pincode picker at all (dumped every
-    // data-testid on the page; nothing resembling `address-selector`
-    // exists), and Swiggy's Instamart homepage - the only place with a real
-    // address search flow - is bot-blocked outright in headless mode
-    // ("Request Blocked - Your request looks automated"). Every per-pincode
-    // copy clicked/filled against selectors that don't exist, silently
-    // no-op'd, and read the SAME server-inferred (IP-based) status
-    // regardless of pincode - same caveat as Amazon/Flipkart above - while
-    // each one still paid Playwright's default 30s timeout waiting on that
-    // nonexistent selector. One national target gets the identical signal
-    // without the 55x duplicate 30s waits. `selector` IS confirmed real
-    // (data-testid="sold-out" is genuinely present on the page), so the
-    // OUT_OF_STOCK reading itself is trustworthy - just never per-city.
-    id: "instamart-ps5-national",
-    label: "Swiggy Instamart - PS5 console (location = wherever this script runs from)",
-    url: "https://www.swiggy.com/stores/instamart/item/MXX8JAYWGR",
-    strategy: "dom",
-    selector: "[data-testid='sold-out']",
-    outOfStockValues: ["sold out"],
-    inStockValues: ["add"],
-  },
+  // --- SWIGGY INSTAMART - REMOVED 2026-08-07. It never once completed a
+  // check: data/state.json has no entry for it at all, meaning every run
+  // since it was wired ended in an exception rather than a stock reading.
+  // Two independent reasons, both re-verified live 2026-08-07:
+  //   1. The item page itself no longer renders for automation - it returns
+  //      Swiggy's error screen ("Something went wrong! Our best minds are on
+  //      this"), with only `simpleheader-back` and `error-button` testids in
+  //      the entire DOM.
+  //   2. Even when it did render, the target was structurally incapable of
+  //      reporting stock: its selector `[data-testid='sold-out']` EXISTS ONLY
+  //      IN THE SOLD-OUT STATE. On a restock that element simply never
+  //      appears, so waitForSelector burns the full 30s timeout and the check
+  //      throws - the one event this target existed to catch was the exact
+  //      event it could not report. A working Instamart target would have to
+  //      watch a container present in BOTH states, matching "sold out" vs
+  //      "add" inside it.
+  // Earlier findings that still stand: the product page has no location
+  // picker at all (every data-testid was dumped - nothing address-related),
+  // and Instamart's homepage, the only place with a real address flow, is
+  // bot-blocked outright headless ("Request Blocked - Your request looks
+  // automated"), so this could never have been a per-pincode check either.
   {
     // Added 2026-07-27 - newer console revision (CFI-2116A01Y) bundled with
     // Astro's Playroom, different listing/pid from flipkart-national above.
     // Same jsonLD-based strategy and same location caveat applies.
     id: "flipkart-ps5-cfi-2116-astros-playroom",
+    platform: "flipkart",
     label: "Flipkart - PS5 Console CFI-2116A01Y w/ Astro's Playroom (location = wherever this script runs from)",
     url: "https://www.flipkart.com/sony-ps5-console-cfi-2116a01y-1024-gb-astros-playroom/p/itmd38e3aba0e54b?pid=GMCHPBNJAP2BPAXK",
     strategy: "dom",
@@ -707,13 +887,16 @@ export const TARGETS: Target[] = [
   // `{}` (not deliverable) for the same SKUs at the same moment. Pincodes are
   // sourced from data/pincodes.json (relianceDigital: true rows) - see the
   // relianceDigitalPincodeTargets factory above. ---------------------------
-  ...PINCODE_ENTRIES.filter((e) => e.relianceDigital).flatMap(relianceDigitalPincodeTargets),
+  ...entries.filter((e) => e.relianceDigital).flatMap(relianceDigitalPincodeTargets),
 
   // --- Reliance Digital pre-order watch, added 2026-07-16 - see the
   // relianceDigitalPreOrderTarget factory above for the verified
   // `_custom_json.pre_order_enabled` contract. One target per SKU (not
   // fanned out per pincode - pre-order eligibility isn't pincode-dependent).
-  // All 3 read `pre_order_enabled: false` at wiring time. -------------------
+  // All read `pre_order_enabled: false` at wiring time. The pre-Slim
+  // `sony-playstation-5-digital-edition-console` watch was dropped alongside
+  // its stock target on 2026-08-07 - see relianceDigitalPincodeTargets above.
+  // -------------------------------------------------------------------------
   relianceDigitalPreOrderTarget({
     idSuffix: "ps5-slim",
     label: "PS5 Slim Console (Disc)",
@@ -723,11 +906,6 @@ export const TARGETS: Target[] = [
     idSuffix: "ps5-slim-digital",
     label: "PS5 Slim Digital Console",
     slug: "sony-playstation-ps5-slim-digital-console-luh1rv-7537999",
-  }),
-  relianceDigitalPreOrderTarget({
-    idSuffix: "ps5-digital-edition",
-    label: "PS5 Digital Edition Console",
-    slug: "sony-playstation-5-digital-edition-console",
   }),
 
   // --- Croma, added 2026-07-15 alongside Reliance Digital - "api" strategy
@@ -756,52 +934,82 @@ export const TARGETS: Target[] = [
     productUrl: "https://www.croma.com/sony-playstation-5-slim-1tb-ssd-gaming-console-white-/p/305985",
   }),
 
-  // --- Quick-commerce examples (BigBasket, Flipkart Minutes, Blinkit,
-  // Swiggy Instamart, Zepto, ...) -----------------------------------------
+  // --- Quick-commerce (Blinkit; BigBasket, Flipkart Minutes, Swiggy
+  // Instamart and Zepto all removed 2026-08-07) ----------------------------
   //
   // Unlike the mainstream retailers above, these DO gate real-time stock
   // behind a delivery pincode/address (they run dark-store fulfillment, not
   // one national inventory pool) - so per-city checks are meaningful here,
-  // via `preActions` driving each site's location picker. Blinkit and Zepto
-  // are now CONFIRMED WORKING (see their own comments below) - Instamart's
-  // location picker was live-tested and found NOT to work headless (see its
-  // comment below for the finding), and BigBasket/Flipkart Minutes were not
-  // live-verified with the same rigor - every id/selector/pincode for those
-  // two is still a PLACEHOLDER. Open the real site in a browser, inspect the
-  // location picker and stock badge with DevTools, and replace these before
-  // running against a live site. See README.md -> "Quick-commerce platforms"
-  // for per-platform feasibility notes.
+  // via `preActions` driving each site's location picker. Blinkit is the only
+  // one left and is CONFIRMED WORKING (see its comments in
+  // quickCommercePincodeTargets above); Instamart's location picker was
+  // live-tested and found NOT to work headless (see its removal note above).
+  //
+  // BIGBASKET AND FLIPKART MINUTES - REMOVED 2026-08-07. Both shipped as
+  // never-verified PLACEHOLDERS: their urls were literally
+  // `bigbasket.com/pd/example-product-slug/` and
+  // `flipkart.com/example-product/p/example-id`, with invented selectors and
+  // pincodes to match. They could never report stock - every cycle they
+  // simply timed out waiting for a selector on a page that doesn't exist,
+  // burning the full 30s request timeout each (a minute per cycle between
+  // them, on a cycle that already struggles to finish) and dropping a
+  // useless screenshot + HTML dump into data/debug/ every single run.
+  // Deleted rather than left in place because a placeholder that always
+  // fails is indistinguishable, in the logs, from a real target that just
+  // broke. To add either platform for real: open the actual PS5 product page
+  // in a browser, inspect its location picker and stock badge with DevTools,
+  // and write a target from what's really there - the way the Blinkit and
+  // Zepto targets below were built. See README.md -> "Quick-commerce
+  // platforms" for per-platform feasibility notes.
 
-  {
-    id: "bigbasket-ps5-411001",
-    label: "BigBasket - Pune 411001",
-    url: "https://www.bigbasket.com/pd/example-product-slug/",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "[data-testid='select-location']" },
-      { action: "fill", selector: "input[name='pincode']", value: "411001", waitAfterMs: 1000 },
-      { action: "click", selector: "[data-testid='pincode-confirm']", waitAfterMs: 1500 },
-    ],
-    selector: "[data-testid='product-availability']",
-    inStockValues: ["add to basket", "in stock"],
-  },
-  {
-    id: "flipkart-minutes-ps5-560001",
-    label: "Flipkart Minutes - Bengaluru 560001",
-    url: "https://www.flipkart.com/example-product/p/example-id",
-    strategy: "dom",
-    preActions: [
-      { action: "click", selector: "#location-widget" },
-      { action: "fill", selector: "input[name='pincode']", value: "560001", waitAfterMs: 1000 },
-      { action: "click", selector: "button._2QwZfM", waitAfterMs: 1500 },
-    ],
-    selector: "._16FRp0", // Flipkart's class names are obfuscated/rotate often - re-verify frequently
-    inStockValues: ["add to cart"],
-  },
-  // --- Quick-commerce pincodes (Blinkit/Zepto/Instamart), sourced from
-  // data/pincodes.json (quickCommerce: true rows) - see the
-  // quickCommercePincodeTargets factory above for the per-row target set and
-  // the searchText field's purpose. Includes the 3 formerly-hardcoded
-  // full-address rows (Kadugodi/Jeevan Bheema Nagar/Chikkabellandur). -------
-  ...PINCODE_ENTRIES.filter((e) => e.quickCommerce).flatMap(quickCommercePincodeTargets),
+  // --- Quick-commerce pincodes (Blinkit only, since Zepto and Instamart were
+  // removed above), sourced from data/pincodes.json (quickCommerce: true
+  // rows) - see the quickCommercePincodeTargets factory above for the per-row
+  // target set and the searchText field's purpose. The pincode list was cut
+  // back to Bangalore-only on 2026-08-07; the former Kadugodi / Jeevan Bheema
+  // Nagar / Chikkabellandur full-address rows went with it, and 560035 is now
+  // a plain-pincode row rather than the Chikkabellandur address row. --------
+  ...entries.filter((e) => e.quickCommerce).flatMap(quickCommercePincodeTargets),
 ];
+
+/**
+ * Every target this file knows how to build for the pincode list on disk,
+ * BEFORE the per-platform on/off switches are applied. The checker should
+ * always use TARGETS (below), never this.
+ */
+export const ALL_TARGETS: Target[] = buildAllTargets(PINCODE_ENTRIES);
+
+/**
+ * Which retailers are switched on, read from data/platforms.json at import
+ * time - same load-once model as the pincode list, so a change here takes
+ * effect on the next process start (or the next GitHub Actions run once the
+ * file is committed), not mid-cycle.
+ */
+const PLATFORM_SWITCHES = loadPlatformSwitchesSync();
+
+/**
+ * How many targets each platform contributes, switched on or not. Takes the
+ * target list as an argument rather than closing over ALL_TARGETS so the admin
+ * UI can recount against a freshly-read pincode file - its counts for the
+ * per-pincode platforms (Blinkit, Reliance Digital) change the moment a
+ * pincode is added or removed, and a number frozen at server start would go
+ * quietly wrong.
+ */
+export function countTargetsByPlatform(targets: Target[]): Record<Platform, number> {
+  return targets.reduce((acc, t) => {
+    acc[t.platform] = (acc[t.platform] ?? 0) + 1;
+    return acc;
+  }, {} as Record<Platform, number>);
+}
+
+/**
+ * The targets the checker actually runs: everything above, minus any platform
+ * switched off in data/platforms.json (manage them with `npm run admin`).
+ *
+ * A switched-off platform is dropped HERE, before index.ts ever sees it - no
+ * request is made, no state entry is written, and no alert can fire for it.
+ * Existing history in data/state.json is left untouched, so switching a
+ * platform back on resumes exactly where it left off rather than re-alerting
+ * on a status it was already at.
+ */
+export const TARGETS: Target[] = ALL_TARGETS.filter((t) => PLATFORM_SWITCHES[t.platform]);

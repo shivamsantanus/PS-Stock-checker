@@ -4,7 +4,7 @@ import fs from "fs/promises";
 import path from "path";
 import { config } from "./config";
 import { logger } from "./logger";
-import { InStockConfirmation, StockResult, StockStatus, Target } from "./types";
+import { InStockConfirmation, JsonFind, StockResult, StockStatus, Target } from "./types";
 
 const COMMON_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
@@ -93,18 +93,57 @@ function resolveJsonPath(obj: unknown, dotPath: string): unknown {
 }
 
 /**
+ * Depth-first search for the object a JsonFind describes - the first one
+ * carrying `where === equals` AND every field in `select`. Returns the
+ * flattened "field=value;" text, or null when no such object exists.
+ *
+ * Requiring all of `select` is what skips the near-miss objects: Blinkit's
+ * response repeats the product id on cart-action stubs and analytics blobs
+ * that carry `inventory` but no `is_sold_out`, and reading stock off one of
+ * those would be silently wrong rather than loudly broken.
+ */
+function resolveJsonFind(root: unknown, find: JsonFind): string | null {
+  let found: string | null = null;
+
+  (function walk(node: unknown): void {
+    if (found !== null || node === null || typeof node !== "object") return;
+    const obj = node as Record<string, unknown>;
+
+    if (
+      obj[find.where] !== undefined &&
+      String(obj[find.where]) === find.equals &&
+      find.select.every((f) => obj[f] !== undefined)
+    ) {
+      found = find.select.map((f) => `${f}=${String(obj[f])};`).join("");
+      return;
+    }
+
+    for (const key of Object.keys(obj)) walk(obj[key]);
+  })(root);
+
+  return found;
+}
+
+/**
  * Owns a single shared Playwright browser instance for the whole run so we
  * don't pay browser-launch cost on every target/cycle. Call close() on
  * shutdown.
  */
 export class StockChecker {
   private browser: Browser | null = null;
+  // One long-lived page per origin for the "browser-api" strategy. Every
+  // target on that origin reuses it, so a cycle pays a single page load
+  // instead of one per check - and the accumulated cookies make the
+  // subsequent JSON calls look like an ordinary browsing session rather
+  // than a cold hit each time.
+  private apiPages = new Map<string, { context: BrowserContext; page: Page }>();
 
   async init(): Promise<void> {
     this.browser = await chromium.launch({ headless: config.headless });
   }
 
   async close(): Promise<void> {
+    this.apiPages.clear();
     await this.browser?.close();
     this.browser = null;
   }
@@ -112,13 +151,81 @@ export class StockChecker {
   async check(target: Target): Promise<StockResult> {
     const checkedAt = new Date().toISOString();
     try {
-      const status =
-        target.strategy === "dom" ? await this.checkDom(target) : await this.checkApi(target);
+      let status: { status: StockStatus; detail: string };
+      if (target.strategy === "dom") {
+        status = await this.checkDom(target);
+      } else if (target.strategy === "browser-api") {
+        status = await this.checkBrowserApi(target);
+      } else {
+        status = await this.checkApi(target);
+      }
       return { target, status: status.status, checkedAt, detail: status.detail };
     } catch (err: any) {
       logger.error(`Check failed for target "${target.id}"`, { error: err.message });
       return { target, status: "UNKNOWN", checkedAt, error: err.message };
     }
+  }
+
+  /** Gets (or opens) the shared page this origin's browser-api calls run in. */
+  private async apiPageFor(origin: string): Promise<Page> {
+    if (!this.browser) throw new Error("Browser not initialized - call init() first");
+
+    const existing = this.apiPages.get(origin);
+    if (existing && !existing.page.isClosed()) return existing.page;
+
+    const context = await this.browser.newContext({
+      userAgent: config.userAgent,
+      locale: "en-IN",
+      extraHTTPHeaders: COMMON_HEADERS,
+    });
+    const page = await context.newPage();
+    // Only needs to reach "a document on this origin exists" - the fetches
+    // below are what actually carry the query, so there's nothing to wait
+    // for beyond the origin being live and its cookies set.
+    await page.goto(origin, { waitUntil: "domcontentloaded", timeout: config.requestTimeoutMs });
+    this.apiPages.set(origin, { context, page });
+    return page;
+  }
+
+  private async checkBrowserApi(target: Target): Promise<{ status: StockStatus; detail: string }> {
+    if (!target.jsonPath && !target.jsonFind) {
+      throw new Error(`Target "${target.id}" uses "browser-api" strategy but has neither jsonPath nor jsonFind`);
+    }
+
+    const page = await this.apiPageFor(new URL(target.url).origin);
+
+    const result = await page.evaluate(
+      async (req: { url: string; method: string; headers: Record<string, string>; body: string | null }) => {
+        const res = await fetch(req.url, {
+          method: req.method,
+          headers: req.headers,
+          body: req.body,
+          credentials: "include",
+        });
+        return { status: res.status, text: await res.text() };
+      },
+      {
+        url: target.url,
+        method: target.method ?? "GET",
+        headers: { "Content-Type": "application/json", ...target.requestHeaders },
+        body: target.method === "POST" ? JSON.stringify(target.requestBody ?? {}) : null,
+      }
+    );
+
+    if (result.status >= 400) {
+      throw new Error(`HTTP ${result.status} from ${target.url}`);
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(result.text);
+    } catch {
+      // A bot-check interstitial answers 200 with HTML - surface that as a
+      // real error instead of letting it fall through to OUT_OF_STOCK.
+      throw new Error(`Non-JSON response from ${target.url}: ${result.text.slice(0, 120)}`);
+    }
+
+    return this.interpretJson(parsed, target);
   }
 
   /**
@@ -224,7 +331,9 @@ export class StockChecker {
   }
 
   private async checkApi(target: Target): Promise<{ status: StockStatus; detail: string }> {
-    if (!target.jsonPath) throw new Error(`Target "${target.id}" uses "api" strategy but has no jsonPath`);
+    if (!target.jsonPath && !target.jsonFind) {
+      throw new Error(`Target "${target.id}" uses "api" strategy but has neither jsonPath nor jsonFind`);
+    }
 
     const response = await axios.request({
       url: target.url,
@@ -240,7 +349,30 @@ export class StockChecker {
       },
     });
 
-    const value = resolveJsonPath(response.data, target.jsonPath);
+    return this.interpretJson(response.data, target);
+  }
+
+  /**
+   * Turns a parsed JSON body into a status + detail, for both the plain-axios
+   * and in-browser API paths (they differ only in how the bytes were fetched).
+   */
+  private interpretJson(data: unknown, target: Target): { status: StockStatus; detail: string } {
+    if (target.jsonFind) {
+      const foundText = resolveJsonFind(data, target.jsonFind);
+      // Throwing (rather than falling through to the OUT_OF_STOCK default)
+      // is deliberate: "the product's object vanished from the response"
+      // means the API shape changed, which must surface as a loud UNKNOWN +
+      // logged error, not as a quiet "not in stock" that looks like a
+      // healthy check forever.
+      if (foundText === null) {
+        throw new Error(
+          `jsonFind ${target.jsonFind.where}=${target.jsonFind.equals} not found in response for target "${target.id}"`
+        );
+      }
+      return { status: resolveStatus(foundText, target), detail: foundText };
+    }
+
+    const value = resolveJsonPath(data, target.jsonPath!);
     if (value === undefined) {
       throw new Error(`jsonPath "${target.jsonPath}" not found in response for target "${target.id}"`);
     }
@@ -255,7 +387,7 @@ export class StockChecker {
     // extract that the notifier appends to alerts - see Target.detailJsonPath.
     let detail = rawText.slice(0, 300);
     if (target.detailJsonPath) {
-      const detailValue = resolveJsonPath(response.data, target.detailJsonPath);
+      const detailValue = resolveJsonPath(data, target.detailJsonPath);
       if (detailValue !== undefined) {
         detail = (typeof detailValue === "object" ? JSON.stringify(detailValue) : String(detailValue)).slice(0, 300);
       }

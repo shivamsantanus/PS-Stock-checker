@@ -98,24 +98,54 @@ delivery location (see "Quick-commerce platforms" below):
   reading `selector`, to drive an on-page location picker (type a pincode,
   click a suggestion, or press Enter to submit).
 
-The pincodes/addresses fed into the Blinkit/Zepto/Instamart and Reliance
+The pincodes/addresses fed into the Blinkit and Reliance
 Digital targets are the one part of `targets.ts` you don't need to edit by
 hand — see "Managing pincodes" below.
 
-## Managing pincodes
+## Turning stores on and off
 
 ```bash
 npm run admin
 # open http://localhost:4321
 ```
 
-This starts a small local server with a browser UI for the pincode list that
-drives the Blinkit/Zepto/Instamart and Reliance Digital targets — add, edit,
-or delete a pincode without touching any `.ts` file. It reads and writes
+The **Stores** panel at the top is a switch per retailer. Flip one off and
+every target belonging to it is dropped before the checker runs — no request
+is made, no state is written, and no alert can fire for it. Each row shows how
+many checks that store contributes per cycle, so you can see the cost of
+keeping it on (Blinkit and Reliance Digital scale with the pincode list; the
+rest are fixed).
+
+Switches live in `data/platforms.json`, a flat `{ "amazon": true, … }` map.
+Anything missing from that file defaults to **on**, so a fresh checkout — or a
+retailer added in a later commit — tracks everything until you say otherwise.
+
+- **Switching off is not deleting.** All the verified selectors, API contracts
+  and post-mortems in `targets.ts` stay put, and `data/state.json` history is
+  untouched — flip a store back on and it resumes from the status it was last
+  at rather than re-alerting. Use a switch for a retailer that's gone quiet;
+  delete the target outright only when a listing is genuinely dead (404'd
+  product, retailer left the market).
+- **A switched-off store is logged at startup**, e.g.
+  `2 store(s) switched OFF, not being checked { off: 'Croma, Amazon.in' }` —
+  so a missed restock can never be silently explained by a forgotten switch.
+- **Commit `data/platforms.json`** for the GitHub Actions cron to respect it,
+  the same as `data/pincodes.json`.
+
+## Managing pincodes
+
+Same page, **Pincodes** panel below the stores — add, edit, or delete a
+pincode without touching any `.ts` file. Only the two per-location stores use
+this list: Blinkit and Reliance Digital. It reads and writes
 `data/pincodes.json` directly; `src/targets.ts` loads that same file at
-startup to build the actual target list, so every pincode row becomes 5
-quick-commerce targets and, if you also check the "Reliance Digital" box, 3
-more.
+startup to build the actual target list, so every pincode row becomes 2
+Blinkit targets and, if you also check the "Reliance Digital" box, 2 more.
+
+Exactly one row (560001) has the Reliance Digital box ticked. That single row
+is the only thing generating RD targets — untick it everywhere and RD
+coverage silently drops to zero. The **Stores** panel at the top of the same
+page shows the live check count each store contributes, so you can see the
+effect of adding or removing a pincode immediately.
 
 A few things worth knowing:
 
@@ -146,15 +176,18 @@ A few things worth knowing:
 `targets.ts` ships with three tiers of confidence, based on live testing
 done while building this — not guesses:
 
-- **Sony Center (shopatsc.com) — verified, high confidence, location-independent.**
-  Sony's official-branded retail chain runs on Shopify, which exposes a
-  public `/products/<handle>.js` endpoint with a clean `available: true/false`
-  boolean per product. This is an `"api"` strategy target: no DOM scraping,
-  no bot-detection exposure, no fragile UI flow, and it's a genuine national
-  online sale — no per-pincode ambiguity. If this shows in stock, you can
-  actually buy it. Sony doesn't sell PS5 hardware through its own sony.co.in
-  store in India — this is the closest thing to an official first-party
-  channel. Covers both the Standard and Digital Edition console SKUs.
+- **Sony Center (shopatsc.com) — REMOVED 2026-08-07, retailer left the
+  market.** Its Shopify `/products/<handle>.js` endpoints for both console
+  SKUs now return 404, and its entire `playstation-5` collection (67
+  products, pulled live) contains no console at all — only console *covers*
+  and accessories. The read never broke; there is simply nothing to check.
+  Worth remembering that this was previously the most reliable target in the
+  file (a clean `available: true/false` boolean, no scraping, no bot
+  detection) — reliability of the *mechanism* says nothing about whether the
+  retailer still sells the product. If it relists, re-add an `"api"` target
+  on `jsonPath: "available"` and find the handle via
+  `/search/suggest.json?q=<query>&resources[type]=product` or
+  `/collections/playstation-5/products.json?limit=250`.
   **Physical Sony Center / Sony Exclusive stores (~113 across India) cannot
   be stock-checked** — investigated 2026-07-15: shopatsc has no in-store
   pickup (so Shopify exposes no per-location inventory), and the site's own
@@ -181,14 +214,31 @@ done while building this — not guesses:
   so `is_pre_order` is checked first and routes to `COMING_SOON` instead of
   a misleading "in stock, buy now" alert. Dormant for both tracked PS5 SKUs
   today (`is_pre_order: false`).
-- **Amazon.in — verified selector, medium confidence, location-dependent.**
-  `#availability` reliably shows "Currently unavailable." when out of stock.
-  **Pre-order detection, added 2026-07-16:** the same `#availability`
-  selector reads `"This item will be released on <date>. Pre-order now."`
-  for genuine pre-order listings — confirmed live against an active GTA VI
-  PS5 listing, so no new scraping infrastructure was needed. Dormant for the
-  PS5 console itself (already released since 2021) — only matters if Amazon
-  lists a new not-yet-released PS5 SKU/bundle.
+- **Amazon.in — verified selector, high confidence in the read,
+  location-dependent.** `#availability` carries a distinct line in all three
+  states, each verified live: `"In stock"`, `"Currently unavailable. We don't
+  know when or if this item will be back in stock."`, and — for genuine
+  pre-orders — `"This item will be released on <date>. Pre-order now."`
+  (confirmed against an active GTA VI PS5 listing, so pre-order detection
+  needed no new scraping infrastructure).
+  **Missed-restock post-mortem, fixed 2026-08-07:** the risk with Amazon is
+  picking the wrong *listing*, not misreading it. This checker originally
+  tracked a single ASIN — `B08FV5GC28`, the 2020 launch console — which is
+  retired and had read "Currently unavailable" on every check for a month
+  straight while Amazon restocked other listings. That ASIN was dropped
+  entirely on 2026-08-07 as a discontinued console generation. It now tracks
+  **14 listings**: the plain Slim Disc/Digital SKUs, the newer Sony-India-sold
+  Slim listing, the legacy console listing, and every Sony console *bundle*
+  (Fortnite, ASTRO BOT, Call of Duty, EA FC 26, 30th Anniversary,
+  2-controller) — bundles included deliberately, because a restock often
+  lands on a bundle SKU while the plain listing stays unavailable.
+  **How to refresh the ASIN list:** do *not* use keyword search — amazon.in
+  drops out-of-stock console listings out of search results entirely (a
+  search for "ps5 slim" returns almost nothing but accessories). Walk
+  Amazon's own PlayStation 5 › Consoles bestseller node
+  (`/gp/bestsellers/videogames/20904636031/`), which still ranks them. As of
+  2026-08-07 there is **no Sony-sold PS5 Pro listing on amazon.in at all** —
+  only third-party Pro accessories.
 - **Flipkart — verified via structured data, high confidence for "in stock
   somewhere," location-dependent for "deliverable to you."** Every product
   page embeds a `<script type="application/ld+json" id="jsonLD">` block
@@ -302,7 +352,7 @@ APIs their own pages call turned out to be openly callable. When a `dom`
 target fights back, always check the Network tab for the underlying API
 first.)
 
-## Quick-commerce platforms (BigBasket, Flipkart Minutes, Blinkit, Instamart, Zepto, ...)
+## Quick-commerce platforms (Blinkit — and why the others were removed)
 
 These are meaningfully harder to monitor reliably than a normal retailer
 page, for two structural reasons:
@@ -325,18 +375,29 @@ page, for two structural reasons:
      info panel (`ProductWrapperRightSection`) or it'll false-positive on
      an unrelated carousel item — the same trap that excluded Vijay Sales
      above.
-   - **BigBasket, Flipkart Minutes** — standard e-commerce web flow, so a
-     `dom` strategy with `preActions` for the pincode picker generally
-     works, going by general site behavior — not verified with the same
-     live rigor as Blinkit yet. Flipkart in particular runs aggressive bot
-     detection (Akamai); expect occasional CAPTCHAs/blocks and keep
-     intervals conservative.
-   - **Swiggy Instamart, Zepto** — built app-first. Their web versions exist
-     but availability/location logic often leans on internal APIs with
-     device/session tokens that a plain browser context doesn't have, so
-     `preActions` may not fully replicate what the app does. Treat the
-     example targets in `targets.ts` for these two as a starting point to
-     adapt, not as working code.
+   - **Zepto — REMOVED 2026-08-07, product delisted.** Both tracked PS5
+     product pages now serve Zepto's 404 page, and a live catalog search for
+     "playstation" returns only controllers, games and accessories — no
+     console in any form. The scraping approach was sound and is preserved
+     verbatim in the removal note at the top of `targets.ts`, so it can be
+     re-wired if Zepto ever relists. Cost of leaving it in: 66 targets ×
+     30s Playwright timeout ≈ **34 minutes of every cycle** spent failing,
+     plus 212 junk dumps in `data/debug/`.
+   - **Swiggy Instamart — REMOVED 2026-08-07, never worked once.**
+     `data/state.json` had no entry for it at all, meaning every run since
+     it was wired ended in an exception. Two independent causes: the item
+     page now returns Swiggy's "Something went wrong!" error screen for
+     automation, and — more instructive — its selector
+     `[data-testid='sold-out']` **only exists in the sold-out state**, so on
+     a restock the element never appears, the wait times out, and the check
+     throws. The one event it existed to catch was the exact event it could
+     not report. Any replacement must watch a container present in *both*
+     states.
+   - **BigBasket, Flipkart Minutes — REMOVED 2026-08-07, never real.** These
+     shipped as placeholders pointing at literal `example-product` URLs with
+     invented selectors, so they could only ever time out. Deleted because a
+     placeholder that always fails is indistinguishable in the logs from a
+     real target that just broke.
 
 Practical recommendations:
 

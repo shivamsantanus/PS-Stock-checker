@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>PS5 Stock Checker — Pincodes</title>
+<title>PS5 Stock Checker — Stores &amp; Pincodes</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
   :root {
@@ -136,6 +136,77 @@
   .empty-state { padding: 40px 20px; text-align: center; color: var(--muted); }
   .empty-state button { margin-top: 12px; }
 
+  /* --- Sections --- */
+  .section + .section { margin-top: 34px; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .section-head h2 { margin: 0; font-size: 1.05rem; }
+  .section-head .section-note { font-size: 0.85rem; color: var(--muted); }
+  .section-head .section-note strong { color: var(--text); }
+
+  /* --- Store on/off switches --- */
+  .platform-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .platform-row:last-child { border-bottom: none; }
+  .platform-row .emoji { font-size: 1.3rem; line-height: 1; flex-shrink: 0; }
+  .platform-main { flex: 1; min-width: 0; }
+  .platform-name { font-weight: 600; font-size: 0.92rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .platform-desc { color: var(--muted); font-size: 0.79rem; margin-top: 3px; line-height: 1.45; }
+  .count-pill {
+    font-size: 0.71rem;
+    font-weight: 600;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+  .platform-row.off { opacity: 0.5; }
+  .platform-row.off .count-pill { text-decoration: line-through; }
+
+  .switch { position: relative; flex-shrink: 0; width: 44px; height: 25px; }
+  .switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+  .switch input:disabled { cursor: progress; }
+  .switch .track { position: absolute; inset: 0; border-radius: 100px; background: var(--border); transition: background 0.18s; }
+  .switch .track::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 19px;
+    height: 19px;
+    border-radius: 50%;
+    background: var(--panel);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: transform 0.18s;
+  }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::after { transform: translateX(19px); }
+  .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .all-off-warning {
+    display: none;
+    margin-top: 12px;
+    padding: 11px 14px;
+    border-radius: 9px;
+    background: var(--warn-soft);
+    color: var(--warn);
+    border: 1px solid var(--warn);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+
   #error-banner {
     display: none;
     align-items: center;
@@ -211,13 +282,15 @@
 </head>
 <body>
 <header>
-  <h1>PS5 Stock Checker — Pincodes</h1>
+  <h1>PS5 Stock Checker</h1>
   <p>
-    This page controls which pincodes get checked for PS5 stock, and which apps
-    each one is checked on. Add, edit, or remove a pincode here — no code
-    changes needed. After you save changes here, commit &amp; push
-    <code>data/pincodes.json</code> so the scheduled checker (GitHub Actions)
-    picks them up too.
+    Switch whole stores on or off, and manage the pincodes checked by the ones
+    that work per location. A store switched off makes no requests and can
+    raise no alerts — nothing is deleted, so flipping it back on picks up right
+    where it left off. Changes take effect the next time the checker starts.
+    Commit &amp; push <code>data/platforms.json</code> and
+    <code>data/pincodes.json</code> so the scheduled run (GitHub Actions) picks
+    them up too.
   </p>
 </header>
 <main>
@@ -226,26 +299,45 @@
     <button type="button" id="error-dismiss" aria-label="Dismiss">✕</button>
   </div>
 
-  <div class="toolbar">
-    <div class="toolbar-summary" id="summary"></div>
-    <input type="search" class="search-input" id="search-box" placeholder="Search by city or pincode…" />
-    <button class="primary" id="open-add">+ Add a pincode</button>
-  </div>
+  <section class="section">
+    <div class="section-head">
+      <h2>Stores</h2>
+      <span class="section-note" id="platform-summary"></span>
+    </div>
+    <div class="panel" id="platform-list"></div>
+    <div class="all-off-warning" id="all-off-warning">
+      ⚠ Every store is switched off, so the checker has nothing left to check —
+      it will run its cycle and alert on nothing. Switch at least one back on.
+    </div>
+  </section>
 
-  <div class="panel">
-    <table>
-      <thead>
-        <tr>
-          <th>Pincode</th>
-          <th>City / label</th>
-          <th>Checked on</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <div class="empty-state" id="empty-state" style="display: none;"></div>
-  </div>
+  <section class="section">
+    <div class="section-head">
+      <h2>Pincodes</h2>
+      <span class="section-note">Only used by the stores that check per location — Blinkit and Reliance Digital.</span>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-summary" id="summary"></div>
+      <input type="search" class="search-input" id="search-box" placeholder="Search by city or pincode…" />
+      <button class="primary" id="open-add">+ Add a pincode</button>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th>Pincode</th>
+            <th>City / label</th>
+            <th>Checked on</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty-state" id="empty-state" style="display: none;"></div>
+    </div>
+  </section>
 </main>
 
 <dialog id="pincode-dialog">
@@ -274,7 +366,7 @@
         <input type="checkbox" id="f-quickCommerce" />
         <div>
           <div class="toggle-card-title">🛵 Delivery apps</div>
-          <div class="toggle-card-desc">Blinkit, Zepto, and Swiggy Instamart</div>
+          <div class="toggle-card-desc">Blinkit — the only per-pincode delivery app still tracked</div>
         </div>
       </label>
 
@@ -296,7 +388,7 @@
       <p class="hint">
         Only needed if this pincode covers more than one delivery zone — most
         pincodes don't. If searching the bare pincode brings up several
-        different area suggestions on Blinkit/Zepto, type a fuller address
+        different area suggestions on Blinkit, type a fuller address
         here instead (street or area name + pincode) so the right one gets
         picked every time.
       </p>
@@ -314,7 +406,9 @@
 
 <script>
   const API = "/api/pincodes";
+  const PLATFORM_API = "/api/platforms";
   let entries = [];
+  let platforms = [];
   let editingId = null; // null while adding, set to an id while editing
   let searchQuery = "";
 
@@ -355,6 +449,71 @@
 
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ---------- store on/off switches ----------
+
+  function renderPlatformSummary() {
+    const on = platforms.filter((p) => p.enabled);
+    const activeChecks = on.reduce((n, p) => n + p.targetCount, 0);
+    const totalChecks = platforms.reduce((n, p) => n + p.targetCount, 0);
+    document.getElementById("platform-summary").innerHTML =
+      `<strong>${on.length}</strong> of ${platforms.length} stores on ` +
+      `&nbsp;·&nbsp; <strong>${activeChecks}</strong> of ${totalChecks} checks running each cycle`;
+    document.getElementById("all-off-warning").style.display = on.length === 0 ? "block" : "none";
+  }
+
+  function renderPlatforms() {
+    const list = document.getElementById("platform-list");
+    list.innerHTML = "";
+
+    for (const p of platforms) {
+      const row = document.createElement("div");
+      row.className = "platform-row" + (p.enabled ? "" : " off");
+      row.innerHTML = `
+        <span class="emoji">${escapeHtml(p.emoji)}</span>
+        <div class="platform-main">
+          <div class="platform-name">
+            ${escapeHtml(p.label)}
+            <span class="count-pill">${p.targetCount} check${p.targetCount === 1 ? "" : "s"}${p.perPincode ? " · per pincode" : ""}</span>
+          </div>
+          <div class="platform-desc">${escapeHtml(p.description)}</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" ${p.enabled ? "checked" : ""} />
+          <span class="track"></span>
+        </label>
+      `;
+      const input = row.querySelector("input");
+      input.setAttribute("aria-label", `Check ${p.label} for stock`);
+      input.addEventListener("change", () => setPlatform(p, input));
+      list.appendChild(row);
+    }
+
+    renderPlatformSummary();
+  }
+
+  async function setPlatform(platform, input) {
+    const next = input.checked;
+    input.disabled = true;
+    try {
+      showError(null);
+      await api("PUT", PLATFORM_API, { [platform.id]: next });
+      platform.enabled = next;
+      showToast(next ? `${platform.label} is now being checked` : `${platform.label} switched off`);
+      renderPlatforms();
+    } catch (err) {
+      // Put the switch back where it was - the server is the source of truth.
+      input.checked = !next;
+      input.disabled = false;
+      showError(err.message);
+    }
+  }
+
+  async function loadPlatforms() {
+    const data = await api("GET", PLATFORM_API);
+    platforms = data.platforms;
+    renderPlatforms();
   }
 
   // ---------- summary + table ----------
@@ -481,7 +640,7 @@
         showToast(`Added ${body.city} ${body.pincode}`);
       }
       closeDialog();
-      await loadEntries();
+      await refreshAll();
     } catch (err) {
       showError(err.message);
     }
@@ -493,7 +652,7 @@
       showError(null);
       await api("DELETE", `${API}/${encodeURIComponent(entry.id)}`);
       showToast(`Deleted ${entry.city} ${entry.pincode}`);
-      await loadEntries();
+      await refreshAll();
     } catch (err) {
       showError(err.message);
     }
@@ -510,7 +669,13 @@
     renderRows();
   });
 
-  loadEntries().catch((err) => showError(err.message));
+  // Pincode edits change the per-pincode stores' check counts, so the store
+  // panel is always refreshed alongside the table.
+  async function refreshAll() {
+    await Promise.all([loadPlatforms(), loadEntries()]);
+  }
+
+  refreshAll().catch((err) => showError(err.message));
 </script>
 </body>
 </html>

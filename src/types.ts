@@ -1,6 +1,28 @@
 export type StockStatus = "IN_STOCK" | "COMING_SOON" | "OUT_OF_STOCK" | "UNKNOWN";
 
-export type CheckStrategy = "dom" | "api";
+/**
+ * "dom"         - load the page in Chromium and read a selector.
+ * "api"         - plain axios call to a JSON endpoint (cheapest; preferred).
+ * "browser-api" - JSON endpoint called via fetch() from INSIDE a real
+ *                 Chromium page on the target's own origin.
+ *
+ * Why "browser-api" exists: Blinkit's availability endpoint is open (no auth,
+ * no cookies) but sits behind Cloudflare bot management, which blocks on TLS
+ * fingerprint rather than on headers. Live-verified 2026-08-07 from one
+ * machine, same moment: curl -> 200, but Node axios, Node fetch/undici, AND
+ * Playwright's own APIRequestContext all -> 403, across every combination of
+ * browser-like headers (Accept-Language, Referer/Origin, sec-fetch-*,
+ * sec-ch-ua, Accept-Encoding). Nothing sent at the header layer fixes it -
+ * the Node TLS stack itself is what's rejected. Issuing the same fetch from
+ * a loaded Chromium page passes, because it IS Chrome's TLS handshake, its
+ * cookie jar and its origin.
+ *
+ * It's also the least detectable option available: one page load per origin
+ * per cycle, then same-origin JSON calls that look exactly like the site's
+ * own client - no headless UI automation, no location-picker driving, and
+ * ~500ms per check instead of ~11s.
+ */
+export type CheckStrategy = "dom" | "api" | "browser-api";
 
 /**
  * A UI step run before reading the stock selector - needed on quick-commerce
@@ -52,11 +74,65 @@ export interface InStockConfirmation {
 }
 
 /**
+ * api strategy only: finds the ONE object describing a specific product
+ * inside a JSON response, instead of pointing at a fixed dot-path.
+ *
+ * Why this exists: Blinkit's product endpoint returns a whole page layout,
+ * and the SAME stock fields (`is_sold_out`, `inventory`) appear on ~90
+ * objects in a single response - the real product, its sticky footer copy,
+ * cart-action templates, analytics blobs, and every unrelated item in the
+ * "you might also like" carousels. A dot-path like
+ * `response.snippets.3.data` happens to hit the right one today, but the
+ * index is just wherever that snippet landed in this render - exactly the
+ * kind of positional guess that produced this file's earlier false alerts.
+ * Matching on the product id instead is stable across layout changes.
+ *
+ * The matched object is flattened to `field=value;` pairs (in `select`
+ * order) for the usual inStockValues/outOfStockValues substring matching.
+ * The trailing `;` matters: it makes "inventory=0;" match a literal zero and
+ * not the "inventory=0" prefix that a value like 100 would otherwise share.
+ */
+export interface JsonFind {
+  // Field the candidate object must carry, e.g. "product_id".
+  where: string;
+  // Value that field must equal - compared as strings, so 779739 and
+  // "779739" both match (the same response uses both forms).
+  equals: string;
+  // Fields read off the matched object, in output order. Every one must be
+  // present, so a partial/template object (e.g. a cart-action stub that has
+  // product_id and inventory but no is_sold_out) is skipped rather than
+  // mistaken for the real product data.
+  select: string[];
+}
+
+/**
+ * The retailer a target belongs to. Every Target carries one, and
+ * data/platforms.json holds an on/off switch per platform - flipping one off
+ * (via `npm run admin`) drops all of its targets out of TARGETS before the
+ * checker ever sees them. See src/platformStore.ts for the switch file and
+ * the filter at the bottom of src/targets.ts for where it's applied.
+ *
+ * Adding a retailer means adding it here, in PLATFORMS (platformStore.ts),
+ * and tagging its targets - the compiler enforces all three, so a new
+ * retailer can't silently ship without a switch.
+ */
+export type Platform =
+  | "amazon"
+  | "blinkit"
+  | "croma"
+  | "flipkart"
+  | "gamestheshop"
+  | "reliancedigital";
+
+/**
  * A single location to monitor. `url` is the page (dom strategy) or
  * JSON endpoint (api strategy) to hit for that specific location.
  */
 export interface Target {
   id: string; // stable unique key, used for state tracking - never change once set
+  // Which retailer this belongs to - drives the per-platform on/off switch in
+  // data/platforms.json. Required so a new target can never miss the switch.
+  platform: Platform;
   label: string; // human readable name shown in logs/notifications
   url: string;
   // Optional: the human-facing product page to link in notifications, for api
@@ -69,6 +145,10 @@ export interface Target {
   selector?: string;
   // api strategy: dot-path into the JSON response, e.g. "data.availability.status"
   jsonPath?: string;
+  // api strategy, alternative to jsonPath: locate the product's own object by
+  // id rather than by position. See JsonFind for why. Exactly one of
+  // jsonPath/jsonFind must be set.
+  jsonFind?: JsonFind;
   // api strategy only, optional: HTTP method (default GET). Some retailers'
   // real availability oracle is a POST (e.g. Croma's OMS delivery-promise
   // endpoint takes the product + pincode in a JSON body).

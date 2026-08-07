@@ -4,7 +4,7 @@ import path from "path";
 
 /**
  * A single location to monitor for the pincode-driven target groups
- * (quick-commerce: Blinkit/Zepto/Instamart, and Reliance Digital) - see
+ * (quick-commerce: Blinkit, and Reliance Digital) - see
  * quickCommercePincodeTargets/relianceDigitalPincodeTargets in targets.ts for
  * how each row turns into concrete Targets. Managed via `npm run admin`
  * instead of editing targets.ts directly.
@@ -19,8 +19,17 @@ export interface PincodeEntry {
   // `pincode` when blank. Needed for addresses where a bare pincode search
   // is ambiguous (multiple dark-store zones share the same pincode).
   searchText?: string;
-  // Include this row in the Blinkit/Zepto/Instamart target group.
+  // Include this row in the Blinkit (quick-commerce) target group.
   quickCommerce: boolean;
+  // Blinkit's availability API is keyed on a coordinate, not on pincode text
+  // (see blinkitPincodeTargets in targets.ts), so each quick-commerce row
+  // needs the lat/lon its address actually resolves to. Populated by
+  // `npm run resolve-latlon`, which asks Blinkit's own geocoder the same
+  // question its location picker does - keeping the coordinate identical to
+  // what a real user selecting this address would get. Rows without them
+  // fall back to the slower browser/location-picker path.
+  lat?: number;
+  lon?: number;
   // Include this row in the Reliance Digital target group.
   relianceDigital: boolean;
 }

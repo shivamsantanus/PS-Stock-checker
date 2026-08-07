@@ -8,6 +8,13 @@ import {
   generateId,
   validatePincodeInput,
 } from "../pincodeStore";
+import {
+  PLATFORMS,
+  PlatformSwitches,
+  loadPlatformSwitches,
+  savePlatformSwitches,
+} from "../platformStore";
+import { buildAllTargets, countTargetsByPlatform } from "../targets";
 
 const PORT = parseInt(process.env.ADMIN_PORT || "4321", 10);
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -52,6 +59,49 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === "/api/pincodes" && req.method === "GET") {
       sendJson(res, 200, await loadPincodeEntries());
+      return;
+    }
+
+    // --- Platform on/off switches ------------------------------------------
+    // GET returns the PLATFORMS metadata joined with the stored switch and the
+    // target count each one contributes, so the UI can render the whole toggle
+    // list from one call. Counts come from ALL_TARGETS (see targets.ts), which
+    // is why a switched-off platform can still show "14 listings".
+    if (pathname === "/api/platforms" && req.method === "GET") {
+      const [switches, entries] = await Promise.all([loadPlatformSwitches(), loadPincodeEntries()]);
+      // Recounted from the pincode file on every request, so Blinkit's and
+      // Reliance Digital's numbers stay right after a pincode is added here.
+      const counts = countTargetsByPlatform(buildAllTargets(entries));
+      sendJson(res, 200, {
+        platforms: PLATFORMS.map((p) => ({
+          ...p,
+          enabled: switches[p.id],
+          targetCount: counts[p.id] ?? 0,
+        })),
+      });
+      return;
+    }
+
+    // PUT takes a partial map ({ croma: false }) and merges it over what's
+    // stored, so toggling one platform can't clobber a concurrent change to
+    // another. platformStore.normalize drops unknown keys and non-booleans.
+    if (pathname === "/api/platforms" && req.method === "PUT") {
+      const body = await readJsonBody(req);
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        sendError(res, 400, "Expected an object of { platformId: boolean }");
+        return;
+      }
+
+      const known = new Set<string>(PLATFORMS.map((p) => p.id));
+      const unknown = Object.keys(body).filter((k) => !known.has(k));
+      if (unknown.length > 0) {
+        sendError(res, 400, `Unknown platform(s): ${unknown.join(", ")}`);
+        return;
+      }
+
+      const merged = { ...(await loadPlatformSwitches()), ...body } as PlatformSwitches;
+      await savePlatformSwitches(merged);
+      sendJson(res, 200, merged);
       return;
     }
 
@@ -111,6 +161,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Pincode admin UI running at http://localhost:${PORT}`);
-  console.log("Edits write to data/pincodes.json - commit & push that file for GitHub Actions to pick them up.");
+  console.log(`Stock checker admin UI running at http://localhost:${PORT}`);
+  console.log("Edits write to data/pincodes.json and data/platforms.json - commit & push both for GitHub Actions to pick them up.");
 });

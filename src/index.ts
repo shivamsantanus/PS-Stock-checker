@@ -1,5 +1,6 @@
 import { config } from "./config";
-import { TARGETS } from "./targets";
+import { ALL_TARGETS, TARGETS } from "./targets";
+import { PLATFORMS, loadPlatformSwitchesSync } from "./platformStore";
 import { logger } from "./logger";
 import { StateManager } from "./stateManager";
 import { StockChecker } from "./scraper";
@@ -110,6 +111,19 @@ async function main(): Promise<void> {
   };
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
+
+  // Log which stores are switched off in data/platforms.json (manage them with
+  // `npm run admin`). Without this line a switched-off store is invisible in
+  // the logs - the run just quietly never mentions it - which is exactly the
+  // wrong way to find out why a restock went unalerted.
+  const switches = loadPlatformSwitchesSync();
+  const disabled = PLATFORMS.filter((p) => !switches[p.id]);
+  if (disabled.length > 0) {
+    logger.warn(`${disabled.length} store(s) switched OFF, not being checked`, {
+      off: disabled.map((p) => p.label).join(", "),
+      skippedTargets: ALL_TARGETS.length - TARGETS.length,
+    });
+  }
 
   logger.info("Stock checker started", {
     targets: TARGETS.length,

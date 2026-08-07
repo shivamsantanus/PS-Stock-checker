@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "admin": "ts-node src/admin/server.ts",
+    "resolve-latlon": "ts-node src/admin/resolveLatLon.ts",
     "postinstall": "playwright install chromium"
   },
   "dependencies": {
