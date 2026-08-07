@@ -1,77 +1,5 @@
 [
   {
-    "id": "147002",
-    "pincode": "147002",
-    "city": "Patiala",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "753004",
-    "pincode": "753004",
-    "city": "Cuttack",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "753006",
-    "pincode": "753006",
-    "city": "Cuttack",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "147001",
-    "pincode": "147001",
-    "city": "Patiala",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "122098",
-    "pincode": "122098",
-    "city": "Gurugram",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "751012",
-    "pincode": "751012",
-    "city": "Bhubaneswar",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "751006",
-    "pincode": "751006",
-    "city": "Bhubaneswar",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "248001",
-    "pincode": "248001",
-    "city": "Dehradun",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "226016",
-    "pincode": "226016",
-    "city": "Lucknow",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
     "id": "560075",
     "pincode": "560075",
     "city": "Bangalore",
@@ -80,52 +8,12 @@
     "relianceDigital": true
   },
   {
-    "id": "177211",
-    "pincode": "177211",
-    "city": "Amb",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "121010",
-    "pincode": "121010",
-    "city": "Faridabad",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "121001",
-    "pincode": "121001",
-    "city": "Faridabad",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "121003",
-    "pincode": "121003",
-    "city": "Faridabad",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
     "id": "560072",
     "pincode": "560072",
     "city": "Bangalore",
     "searchText": "",
     "quickCommerce": true,
     "relianceDigital": false
-  },
-  {
-    "id": "221010",
-    "pincode": "221010",
-    "city": "Varanasi",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
   },
   {
     "id": "560062",
@@ -320,108 +208,12 @@
     "relianceDigital": false
   },
   {
-    "id": "400701",
-    "pincode": "400701",
-    "city": "Ghansoli, Navi Mumbai",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "411004",
-    "pincode": "411004",
-    "city": "Pune",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "411005",
-    "pincode": "411005",
-    "city": "Pune",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "411016",
-    "pincode": "411016",
-    "city": "Pune",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "411001",
-    "pincode": "411001",
-    "city": "Pune",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "411045",
-    "pincode": "411045",
-    "city": "Pune",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "400013",
-    "pincode": "400013",
-    "city": "Mumbai",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "570018",
-    "pincode": "570018",
-    "city": "Mysore",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "500032",
-    "pincode": "500032",
-    "city": "Hyderabad",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
     "id": "560098",
     "pincode": "560098",
     "city": "Bangalore",
     "searchText": "",
     "quickCommerce": true,
     "relianceDigital": false
-  },
-  {
-    "id": "201002",
-    "pincode": "201002",
-    "city": "Ghaziabad",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
-  },
-  {
-    "id": "431509",
-    "pincode": "431509",
-    "city": "Jalna",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": false
-  },
-  {
-    "id": "431001",
-    "pincode": "431001",
-    "city": "Jalna",
-    "searchText": "",
-    "quickCommerce": true,
-    "relianceDigital": true
   },
   {
     "id": "kadugodi-560067",

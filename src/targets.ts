@@ -375,16 +375,17 @@ function relianceDigitalPincodeTargets(entry: PincodeEntry): Target[] {
 }
 
 /**
- * The 5 quick-commerce targets (Blinkit x2 SKUs, Instamart placeholder,
- * Zepto x2 SKUs) for one pincode entry. Uses `entry.searchText` instead of
- * the bare pincode when set - needed because a bare-pincode search on
- * Zepto/Blinkit can resolve ambiguously to more than one dark-store zone
- * (live-verified case: pincode 560067/Kadugodi returned multiple distinct
- * locality suggestions serving different stores) - a fuller address string
- * makes the first suggestion clicked deterministically the right store.
- * `entry.id` (not the bare pincode) is the id suffix so rows with a custom
- * address get their own distinct target ids alongside a plain-pincode row
- * for the same pincode.
+ * The 4 quick-commerce targets (Blinkit x2 SKUs, Zepto x2 SKUs) for one
+ * pincode entry. Instamart is NOT per-pincode here - see the standalone
+ * instamart-ps5-national target below for why. Uses `entry.searchText`
+ * instead of the bare pincode when set - needed because a bare-pincode
+ * search on Zepto/Blinkit can resolve ambiguously to more than one
+ * dark-store zone (live-verified case: pincode 560067/Kadugodi returned
+ * multiple distinct locality suggestions serving different stores) - a
+ * fuller address string makes the first suggestion clicked deterministically
+ * the right store. `entry.id` (not the bare pincode) is the id suffix so
+ * rows with a custom address get their own distinct target ids alongside a
+ * plain-pincode row for the same pincode.
  */
 function quickCommercePincodeTargets(entry: PincodeEntry): Target[] {
   const { id, pincode, city } = entry;
@@ -438,42 +439,6 @@ function quickCommercePincodeTargets(entry: PincodeEntry): Target[] {
       selector: "div[class*='ProductWrapperRightSection']",
       comingSoonValues: ["coming soon"],
       outOfStockValues: ["out of stock"],
-      inStockValues: ["add"],
-    },
-    {
-      // PLACEHOLDER preActions - CONFIRMED NOT TO WORK, live-tested
-      // 2026-07-08 against this exact product URL. Findings:
-      //   - The real product page has NO location/pincode picker element at
-      //     all - dumped every data-testid on the page (30 of them) and the
-      //     full header HTML; nothing resembling `address-selector` exists.
-      //     Stock appears to resolve server-side (IP-based), the same
-      //     caveat that applies to Amazon/Flipkart above.
-      //   - Swiggy's Instamart homepage (the only place with a real address
-      //     search flow) is bot-blocked outright in headless mode:
-      //     "Request Blocked - Your request looks automated".
-      // Net effect: every entry generated from this factory will click/fill
-      // against selectors that don't exist, silently no-op, and all of them
-      // will report the SAME (server-inferred) status regardless of pincode -
-      // this does NOT actually check per-city availability yet. `selector`
-      // below IS confirmed real (data-testid="sold-out" is genuinely present
-      // on the page today), so the OUT_OF_STOCK reading itself is
-      // trustworthy - just not the per-pincode part.
-      id: `instamart-ps5-${id}`,
-      label: `Swiggy Instamart - ${city} ${pincode} (location NOT verified - see comment)`,
-      url: "https://www.swiggy.com/stores/instamart/item/MXX8JAYWGR",
-      strategy: "dom",
-      preActions: [
-        { action: "click", selector: "[data-testid='address-selector']" },
-        {
-          action: "fill",
-          selector: "input[placeholder='Search for area, street name...']",
-          value: locationValue,
-          waitAfterMs: 1200,
-        },
-        { action: "click", selector: "[data-testid='address-search-result-0']", waitAfterMs: 1500 },
-      ],
-      selector: "[data-testid='sold-out']",
-      outOfStockValues: ["sold out"],
       inStockValues: ["add"],
     },
     {
@@ -695,6 +660,30 @@ export const TARGETS: Target[] = [
     selector: "script#jsonLD",
     outOfStockValues: ["schema.org/outofstock"],
     inStockValues: ["schema.org/instock"],
+  },
+  {
+    // Was previously fanned out per-pincode (one target per row in
+    // data/pincodes.json) - live-tested 2026-07-08 and confirmed the real
+    // product page has NO location/pincode picker at all (dumped every
+    // data-testid on the page; nothing resembling `address-selector`
+    // exists), and Swiggy's Instamart homepage - the only place with a real
+    // address search flow - is bot-blocked outright in headless mode
+    // ("Request Blocked - Your request looks automated"). Every per-pincode
+    // copy clicked/filled against selectors that don't exist, silently
+    // no-op'd, and read the SAME server-inferred (IP-based) status
+    // regardless of pincode - same caveat as Amazon/Flipkart above - while
+    // each one still paid Playwright's default 30s timeout waiting on that
+    // nonexistent selector. One national target gets the identical signal
+    // without the 55x duplicate 30s waits. `selector` IS confirmed real
+    // (data-testid="sold-out" is genuinely present on the page), so the
+    // OUT_OF_STOCK reading itself is trustworthy - just never per-city.
+    id: "instamart-ps5-national",
+    label: "Swiggy Instamart - PS5 console (location = wherever this script runs from)",
+    url: "https://www.swiggy.com/stores/instamart/item/MXX8JAYWGR",
+    strategy: "dom",
+    selector: "[data-testid='sold-out']",
+    outOfStockValues: ["sold out"],
+    inStockValues: ["add"],
   },
   {
     // Added 2026-07-27 - newer console revision (CFI-2116A01Y) bundled with
