@@ -12,6 +12,8 @@ import { logger } from "./logger";
 export class StateManager {
   private state: StateMap = {};
   private readonly filePath: string;
+  // Tail of the serialized write chain - see persist().
+  private writeQueue: Promise<void> = Promise.resolve();
 
   constructor(filePath: string = config.stateFilePath) {
     this.filePath = filePath;
@@ -51,7 +53,26 @@ export class StateManager {
     await this.persist();
   }
 
-  private async persist(): Promise<void> {
+  /**
+   * Serializes every write onto a single chain. The tiered poller runs the hot
+   * and cold sweeps as concurrent loops, and the hot sweep itself checks
+   * several targets at once - so without this, multiple persists would race on
+   * the SAME `${filePath}.tmp` path, and one call's rename could publish
+   * another call's half-written bytes.
+   *
+   * The chain deliberately recovers from a rejected predecessor (the second
+   * arm of `.then`): one failed write must not permanently wedge every
+   * subsequent state update behind it.
+   */
+  private persist(): Promise<void> {
+    this.writeQueue = this.writeQueue.then(
+      () => this.writeNow(),
+      () => this.writeNow()
+    );
+    return this.writeQueue;
+  }
+
+  private async writeNow(): Promise<void> {
     const dir = path.dirname(this.filePath);
     await fs.mkdir(dir, { recursive: true });
 

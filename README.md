@@ -444,12 +444,80 @@ npm run dev      # ts-node, for local development
 npm run build && npm start   # compiled JS
 ```
 
+## Tiered polling (added 2026-08-08)
+
+Targets are split by how expensive they are to check, and the two tiers run
+as **concurrent loops** rather than one interleaved cycle:
+
+| Tier | Targets | Default cadence | What they are |
+| --- | --- | --- | --- |
+| Hot | `strategy: "browser-api"` | every 60s (`HOT_INTERVAL_SECONDS`) | one `fetch` on an already-open page, no render — all the Blinkit per-pincode checks |
+| Cold | everything else | every 5 min (`COLD_INTERVAL_MINUTES`) | full page renders plus the batched Reliance Digital phantom pass |
+
+Why they are separate loops: a cold sweep takes **~2.5 minutes** measured
+(27 targets, 16 of them DOM renders), so running both in one cycle stalled
+the cheap checks behind the expensive ones. Previously all 55 targets ran
+sequentially at one interval and spent ~3.7 minutes per cycle merely
+*asleep* between targets.
+
+**Escalation.** When the hot tier sees any target newly go `IN_STOCK` or
+`COMING_SOON`, it pulls the cold sweep forward instead of waiting out its
+interval — restocks often land across several retailers within minutes.
+
+**Rate-limit backoff — and why the defaults are not more aggressive.**
+Measured 2026-08-08: a 30s hot interval at concurrency 4 got HTTP 429'd by
+Blinkit on its *second* sweep. The hot targets are only **two** distinct
+product endpoints (one per SKU) fetched once per pincode with different
+`lat`/`lon` headers, so a sweep lands N hits on the same URL within seconds —
+that, not the target count, is what trips the limit. At 60s/concurrency 2 a
+sweep takes ~12s and 429s are occasional and transient. If more than a
+quarter of a sweep comes back rate-limited, the interval doubles (up to
+`HOT_BACKOFF_MAX_SECONDS`) and only resets after a clean sweep.
+
+A rate-limited check reads `UNKNOWN` and is skipped for state purposes — it
+never turns into a false `OUT_OF_STOCK`.
+
+> Hot-tier jitter is `HOT_JITTER_PERCENT` of the interval, **not** the flat
+> `JITTER_SECONDS` used by the cold tier. That value is sized for a
+> 10-minute cadence; applying ±30s to a 30s interval let two sweeps fire ~10s
+> apart, which is how the 429s above were first provoked.
+
+## Running 24/7 on your own PC (Windows)
+
+Preferred over the GitHub Actions cron below — no scheduling delay, no
+per-run setup cost, and the process keeps one browser warm.
+
+```bash
+npm run build
+npm run install-task     # registers a Scheduled Task, starts at logon
+```
+
+Then `Start-ScheduledTask -TaskName PS5StockChecker` to start it immediately
+without logging out. The task restarts itself on crash and has no execution
+time limit. See `scripts/install-windows-task.ps1` for the management
+commands (status/stop/remove).
+
+Two things to know:
+
+- The task runs **at logon**, so it does not check while you are signed out
+  unless you reconfigure it to "Run whether user is logged on or not".
+- **Disable the GitHub Actions cron if you run this locally**, or you will
+  get duplicate alerts from two independent checkers with two independent
+  state stores. Comment out the `schedule:` block in
+  `.github/workflows/stock-check.yml` (leaving `workflow_dispatch` so you can
+  still trigger it by hand).
+
 ## How it avoids spam
 
 `data/state.json` stores the last known status per target. A notification
 only fires on an `OUT_OF_STOCK`/`UNKNOWN` -> `IN_STOCK` transition. Repeated
 checks while a target stays in stock (or stays out of stock) produce no
 notification, only a log line.
+
+Because the tiers run concurrently and the hot sweep checks several targets
+at once, every state write is serialized onto a single chain (see
+`persist()` in `src/stateManager.ts`) — otherwise concurrent writes would
+race on the same temp file and one could publish another's partial bytes.
 
 ## Running 24/7 on GitHub Actions
 
@@ -486,10 +554,13 @@ Caveats vs. hosting it yourself on a VPS:
 ## How it avoids looking like a bot
 
 - Realistic desktop Chrome user-agent + Accept/Accept-Language headers.
-- Sequential checks per cycle (not parallel), each pair separated by a
+- Cold-tier checks run sequentially (not parallel), each pair separated by a
   randomized delay (`MIN/MAX_DELAY_BETWEEN_TARGETS_MS`).
-- The whole cycle repeats on `CHECK_INTERVAL_MINUTES` +/- a random
-  `JITTER_SECONDS`, instead of a perfectly uniform cron tick.
+- Hot-tier checks run at a small fixed concurrency (`HOT_CONCURRENCY`, default
+  2) with a random 0-`HOT_REQUEST_JITTER_MS` pause before each request, so a
+  sweep is a few overlapping requests rather than a uniform burst.
+- Each tier repeats on its own interval +/- random jitter, instead of a
+  perfectly uniform cron tick.
 
 None of this guarantees you won't be bot-blocked by something like
 Cloudflare on a well-defended site — for consistently reliable checks,

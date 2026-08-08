@@ -47,6 +47,42 @@ export const config = {
   checkIntervalMinutes: optionalInt("CHECK_INTERVAL_MINUTES", 10),
   jitterSeconds: optionalInt("JITTER_SECONDS", 30),
 
+  // --- Tiered polling (see runHotSweep/runColdSweep in index.ts) ---------
+  // Targets are split by how expensive they are to check, not by platform:
+  // the "hot" tier is every browser-api target (one fetch on an already-open
+  // page, no render), the "cold" tier is everything else (full page renders
+  // and the batched Reliance Digital phantom pass). Polling them at one
+  // shared interval meant the cheap checks were held back by the expensive
+  // ones - a full 55-target sequential cycle spent ~3.7 minutes asleep before
+  // any target got looked at twice.
+  //
+  // MEASURED 2026-08-08, and the reason these defaults are not more
+  // aggressive: a 30s interval at concurrency 4 got the hot tier HTTP 429'd
+  // by Blinkit on its SECOND sweep. The 28 hot targets are only 2 distinct
+  // product endpoints (one per SKU) fetched 14 times each with different
+  // lat/lon headers, so a sweep lands 14 hits on the same URL within seconds
+  // - which is what trips the limit, not the target count itself. 60s at
+  // concurrency 2 keeps the sustained rate near 0.5 req/s.
+  hotIntervalSeconds: optionalInt("HOT_INTERVAL_SECONDS", 60),
+  coldIntervalMinutes: optionalInt("COLD_INTERVAL_MINUTES", 5),
+  // How many hot-tier checks may be in flight at once. Deliberately small:
+  // Blinkit sits behind Cloudflare bot management (see CheckStrategy in
+  // types.ts), and firing many at once looks far more like a scraper than a
+  // couple of overlapping requests do.
+  hotConcurrency: optionalInt("HOT_CONCURRENCY", 2),
+  // Jitter applied per hot-tier request so a sweep doesn't fire as a
+  // perfectly uniform burst.
+  hotRequestJitterMs: optionalInt("HOT_REQUEST_JITTER_MS", 800),
+  // Hot-tier jitter is a PERCENTAGE of the hot interval, not the flat
+  // jitterSeconds above: that value is sized for the 10-minute cold cadence,
+  // and applying +/-30s to a 30s interval let two sweeps fire ~10s apart,
+  // which is exactly how the 429 above was provoked.
+  hotJitterPercent: optionalInt("HOT_JITTER_PERCENT", 20),
+  // When a sweep comes back mostly rate-limited, the interval doubles (up to
+  // this ceiling) and only resets after a clean sweep - so a rate-limit spike
+  // backs off instead of hammering through it.
+  hotBackoffMaxSeconds: optionalInt("HOT_BACKOFF_MAX_SECONDS", 600),
+
   // When true, run a single check cycle and exit instead of looping forever.
   // Used when the scheduling itself is external (e.g. a GitHub Actions cron).
   runOnce: optionalBool("RUN_ONCE", false),

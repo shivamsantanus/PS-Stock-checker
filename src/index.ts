@@ -17,13 +17,43 @@ function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-/** Fires the back-in-stock/coming-soon alerts and persists state for one already-checked result. */
-async function handleCheckResult(state: StateManager, target: Target, result: StockResult): Promise<void> {
+/**
+ * Runs `fn` over `items` with at most `limit` in flight. Results keep input
+ * order. Used for the hot tier only - see config.hotConcurrency for why the
+ * limit is deliberately small rather than "all of them at once".
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index]);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
+
+/**
+ * Fires the back-in-stock/coming-soon alerts and persists state for one
+ * already-checked result. Returns true when this result represents a NEW
+ * IN_STOCK or COMING_SOON transition - the hot tier uses that to escalate
+ * (see Controller.requestColdSweep).
+ */
+async function handleCheckResult(state: StateManager, target: Target, result: StockResult): Promise<boolean> {
   if (result.error) {
     // Log and move on - a single broken selector/endpoint should never take
     // down the whole loop.
     logger.warn(`Skipping state update for "${target.id}" due to check error`, { error: result.error });
-    return;
+    return false;
   }
 
   const previousStatus = state.getPreviousStatus(target.id);
@@ -40,26 +70,70 @@ async function handleCheckResult(state: StateManager, target: Target, result: St
   }
 
   await state.recordCheck(target.id, result.status);
+  return justCameInStock || justBecameComingSoon;
 }
 
-/** Runs one full pass over every target, sequentially, with human-ish pacing. */
-async function runCheckCycle(checker: StockChecker, state: StateManager): Promise<void> {
-  logger.info(`Starting check cycle over ${TARGETS.length} target(s)`);
+// Targets are tiered by check cost, not by platform - see the tiered-polling
+// block in config.ts. "browser-api" is one fetch on an already-open page;
+// everything else is a full render or a batched cross-pincode pass.
+const HOT_TARGETS = TARGETS.filter((t) => t.strategy === "browser-api");
+const COLD_TARGETS = TARGETS.filter((t) => t.strategy !== "browser-api");
 
-  // Reliance Digital's anonymous inventory API can return a fulfilling store
-  // that isn't real per-pincode stock (see the "KNOWN LIMIT - PHANTOM STORE
-  // STOCK" comment on relianceDigitalTarget in targets.ts) - so its targets
-  // are checked as one batch FIRST, and detectPhantomStock cross-references
-  // every result's fulfilling store across pincodes before any alert fires,
-  // instead of alerting on each in isolation as it's checked.
-  const rdTargets = TARGETS.filter((t) => t.id.startsWith("reliancedigital-"));
-  const otherTargets = TARGETS.filter((t) => !t.id.startsWith("reliancedigital-"));
+/**
+ * The cheap tier: every browser-api target, checked concurrently. Returns
+ * true if any target newly went IN_STOCK/COMING_SOON, so the caller can pull
+ * the cold sweep forward instead of waiting out its interval.
+ */
+async function runHotSweep(
+  checker: StockChecker,
+  state: StateManager
+): Promise<{ changed: boolean; rateLimited: boolean }> {
+  const startedAt = Date.now();
+  let rateLimitedCount = 0;
+
+  const escalations = await mapWithConcurrency(HOT_TARGETS, config.hotConcurrency, async (target) => {
+    // Per-request jitter so a sweep doesn't leave a perfectly uniform,
+    // obviously-scripted request pattern in Blinkit's logs.
+    await sleep(randomBetween(0, config.hotRequestJitterMs));
+    const result = await checker.check(target);
+    if (result.error?.includes("HTTP 429")) rateLimitedCount++;
+    return handleCheckResult(state, target, result);
+  });
+
+  const changed = escalations.some(Boolean);
+  // A handful of 429s is noise; a sweep that is mostly rate-limited means the
+  // current cadence is over Blinkit's tolerance and must back off.
+  const rateLimited = rateLimitedCount > HOT_TARGETS.length / 4;
+
+  logger.info("Hot sweep complete", {
+    targets: HOT_TARGETS.length,
+    seconds: Math.round((Date.now() - startedAt) / 1000),
+    rateLimited: rateLimitedCount,
+    escalating: changed,
+  });
+  return { changed, rateLimited };
+}
+
+/**
+ * The expensive tier: DOM renders plus the batched Reliance Digital pass.
+ *
+ * Reliance Digital's anonymous inventory API can return a fulfilling store
+ * that isn't real per-pincode stock (see the "KNOWN LIMIT - PHANTOM STORE
+ * STOCK" comment on relianceDigitalTarget in targets.ts) - so its targets are
+ * checked as one batch FIRST, and detectPhantomStock cross-references every
+ * result's fulfilling store before any alert fires, instead of alerting on
+ * each in isolation as it's checked.
+ */
+async function runColdSweep(checker: StockChecker, state: StateManager): Promise<void> {
+  const startedAt = Date.now();
+
+  const rdTargets = COLD_TARGETS.filter((t) => t.id.startsWith("reliancedigital-"));
+  const otherTargets = COLD_TARGETS.filter((t) => !t.id.startsWith("reliancedigital-"));
 
   const rdResults: StockResult[] = [];
   for (const target of rdTargets) {
     rdResults.push(await checker.check(target));
-    const delay = randomBetween(config.minDelayBetweenTargetsMs, config.maxDelayBetweenTargetsMs);
-    await sleep(delay);
+    await sleep(randomBetween(config.minDelayBetweenTargetsMs, config.maxDelayBetweenTargetsMs));
   }
 
   // Read the pincode file fresh here rather than reusing a value captured at
@@ -79,19 +153,101 @@ async function runCheckCycle(checker: StockChecker, state: StateManager): Promis
 
     // Small randomized pause between hitting different targets so requests
     // don't fire in a suspiciously uniform burst.
-    const delay = randomBetween(config.minDelayBetweenTargetsMs, config.maxDelayBetweenTargetsMs);
-    await sleep(delay);
+    await sleep(randomBetween(config.minDelayBetweenTargetsMs, config.maxDelayBetweenTargetsMs));
   }
 
-  logger.info("Check cycle complete");
+  logger.info("Cold sweep complete", {
+    targets: COLD_TARGETS.length,
+    seconds: Math.round((Date.now() - startedAt) / 1000),
+  });
 }
 
-/** Computes the next wait time: base interval +/- configured jitter. */
-function nextIntervalMs(): number {
-  const baseMs = config.checkIntervalMinutes * 60_000;
-  const jitterMs = config.jitterSeconds * 1_000;
-  const offset = randomBetween(-jitterMs, jitterMs);
-  return Math.max(0, baseMs + offset);
+/**
+ * Shared shutdown flag plus the escalation signal between the two loops.
+ *
+ * The tiers run as genuinely concurrent loops rather than one interleaved
+ * cycle, because a cold sweep takes minutes (16 DOM renders) and would
+ * otherwise stall the 30-second hot tier behind it every time it ran.
+ */
+class Controller {
+  shuttingDown = false;
+  private wakeCold: (() => void) | null = null;
+
+  /** Pulls the next cold sweep forward - called when the hot tier sees a change. */
+  requestColdSweep(): void {
+    this.wakeCold?.();
+  }
+
+  /** Sleeps until `ms` elapses, shutdown begins, or a cold sweep is requested. */
+  waitForCold(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        this.wakeCold = null;
+        resolve();
+      };
+      const timer = setTimeout(finish, ms);
+      // Node keeps the process alive for a pending timer; this one is a
+      // plain wait, so let it not block a clean exit.
+      timer.unref?.();
+      this.wakeCold = finish;
+    });
+  }
+}
+
+async function hotLoop(checker: StockChecker, state: StateManager, ctl: Controller): Promise<void> {
+  // Grows on rate-limited sweeps, resets on a clean one - see hotBackoffMaxSeconds.
+  let intervalSeconds = config.hotIntervalSeconds;
+
+  while (!ctl.shuttingDown) {
+    try {
+      const { changed, rateLimited } = await runHotSweep(checker, state);
+
+      if (rateLimited) {
+        intervalSeconds = Math.min(intervalSeconds * 2, config.hotBackoffMaxSeconds);
+        logger.warn("Hot tier is being rate-limited, backing off", { nextIntervalSeconds: intervalSeconds });
+      } else if (intervalSeconds !== config.hotIntervalSeconds) {
+        logger.info("Hot tier recovered, restoring normal interval", {
+          intervalSeconds: config.hotIntervalSeconds,
+        });
+        intervalSeconds = config.hotIntervalSeconds;
+      }
+
+      if (changed) {
+        // Something moved. Check the expensive tier right now rather than
+        // waiting out its interval - a restock often lands across several
+        // retailers within the same few minutes.
+        logger.info("Hot tier saw a change, pulling the cold sweep forward");
+        ctl.requestColdSweep();
+      }
+    } catch (err: any) {
+      logger.error("Unhandled error during hot sweep", { error: err.message });
+      await notifyError(`hot sweep: ${err.message}`);
+    }
+
+    if (ctl.shuttingDown) break;
+    // Jitter is a share of THIS interval, so it can never swallow the whole
+    // gap and fire two sweeps back to back (which is what drew the 429s).
+    const jitterMs = (intervalSeconds * 1000 * config.hotJitterPercent) / 100;
+    await sleep(Math.max(1000, intervalSeconds * 1000 + randomBetween(-jitterMs, jitterMs)));
+  }
+}
+
+async function coldLoop(checker: StockChecker, state: StateManager, ctl: Controller): Promise<void> {
+  while (!ctl.shuttingDown) {
+    try {
+      await runColdSweep(checker, state);
+    } catch (err: any) {
+      logger.error("Unhandled error during cold sweep", { error: err.message });
+      await notifyError(`cold sweep: ${err.message}`);
+    }
+
+    if (ctl.shuttingDown) break;
+    await ctl.waitForCold(config.coldIntervalMinutes * 60_000);
+  }
 }
 
 async function main(): Promise<void> {
@@ -103,15 +259,17 @@ async function main(): Promise<void> {
 
   const state = new StateManager();
   const checker = new StockChecker();
+  const ctl = new Controller();
 
   await state.load();
   await checker.init();
 
-  let shuttingDown = false;
   const shutdown = async (signal: string) => {
-    if (shuttingDown) return;
-    shuttingDown = true;
+    if (ctl.shuttingDown) return;
+    ctl.shuttingDown = true;
     logger.info(`Received ${signal}, shutting down gracefully...`);
+    // Releases coldLoop from its interval wait so it can observe the flag.
+    ctl.requestColdSweep();
     await checker.close();
     process.exit(0);
   };
@@ -132,34 +290,26 @@ async function main(): Promise<void> {
   }
 
   logger.info("Stock checker started", {
-    targets: TARGETS.length,
-    intervalMinutes: config.checkIntervalMinutes,
-    jitterSeconds: config.jitterSeconds,
+    hotTargets: HOT_TARGETS.length,
+    hotIntervalSeconds: config.hotIntervalSeconds,
+    hotConcurrency: config.hotConcurrency,
+    coldTargets: COLD_TARGETS.length,
+    coldIntervalMinutes: config.coldIntervalMinutes,
   });
 
-  while (!shuttingDown) {
-    try {
-      await runCheckCycle(checker, state);
-    } catch (err: any) {
-      // Catch-all so an unexpected failure (e.g. browser crash) doesn't
-      // kill the whole process - log it, alert, and keep looping.
-      logger.error("Unhandled error during check cycle", { error: err.message });
-      await notifyError(err.message);
-    }
-
-    if (shuttingDown) break;
-
-    if (config.runOnce) {
-      logger.info("RUN_ONCE is set, exiting after a single cycle");
-      break;
-    }
-
-    const waitMs = nextIntervalMs();
-    logger.info(`Sleeping for ${Math.round(waitMs / 1000)}s until next cycle`);
-    await sleep(waitMs);
+  // RUN_ONCE keeps the GitHub Actions path working: one sweep of each tier,
+  // then exit, with no interval waits.
+  if (config.runOnce) {
+    await runHotSweep(checker, state);
+    await runColdSweep(checker, state);
+    logger.info("RUN_ONCE is set, exiting after a single sweep of each tier");
+    await checker.close();
+    return;
   }
 
-  if (!shuttingDown) {
+  await Promise.all([hotLoop(checker, state, ctl), coldLoop(checker, state, ctl)]);
+
+  if (!ctl.shuttingDown) {
     await checker.close();
   }
 }
