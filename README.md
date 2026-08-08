@@ -451,7 +451,7 @@ as **concurrent loops** rather than one interleaved cycle:
 
 | Tier | Targets | Default cadence | What they are |
 | --- | --- | --- | --- |
-| Hot | `strategy: "browser-api"` | every 60s (`HOT_INTERVAL_SECONDS`) | one `fetch` on an already-open page, no render — all the Blinkit per-pincode checks |
+| Hot | `strategy: "browser-api"` | every 90s (`HOT_INTERVAL_SECONDS`) | one `fetch` on an already-open page, no render — all the Blinkit per-pincode checks |
 | Cold | everything else | every 5 min (`COLD_INTERVAL_MINUTES`) | full page renders plus the batched Reliance Digital phantom pass |
 
 Why they are separate loops: a cold sweep takes **~2.5 minutes** measured
@@ -469,10 +469,28 @@ Measured 2026-08-08: a 30s hot interval at concurrency 4 got HTTP 429'd by
 Blinkit on its *second* sweep. The hot targets are only **two** distinct
 product endpoints (one per SKU) fetched once per pincode with different
 `lat`/`lon` headers, so a sweep lands N hits on the same URL within seconds —
-that, not the target count, is what trips the limit. At 60s/concurrency 2 a
-sweep takes ~12s and 429s are occasional and transient. If more than a
-quarter of a sweep comes back rate-limited, the interval doubles (up to
-`HOT_BACKOFF_MAX_SECONDS`) and only resets after a clean sweep.
+that, not the target count, is what trips the limit. A sweep itself takes
+~12s regardless.
+
+**The limit is per-IP and differs per connection**, which is why the interval
+self-tunes rather than being a fixed number:
+
+- More than a quarter of a sweep rate-limited → the interval **doubles** (up
+  to `HOT_BACKOFF_MAX_SECONDS`), and that rate is recorded as a known-bad
+  **floor** which recovery will never step back below.
+- After `HOT_RECOVERY_CLEAN_SWEEPS` consecutive clean sweeps → the interval
+  **halves**, but never below that floor.
+
+Both halves of that matter. The first version reset straight to the base
+interval after a single clean sweep, which put it back at exactly the rate
+that had just been limited — observed live as a `60→120→60→120` sawtooth. The
+ratcheting floor is what makes it converge: simulated against connections
+tolerating 90s/120s/150s/240s, it settles at 90/141/176/281 respectively and
+stops being rate-limited entirely.
+
+So a machine on a stricter connection finds its own level instead of needing
+a hand-tuned `HOT_INTERVAL_SECONDS`. Lower the base per-machine only if an IP
+proves it can sustain more.
 
 A rate-limited check reads `UNKNOWN` and is skipped for state purposes — it
 never turns into a false `OUT_OF_STOCK`.

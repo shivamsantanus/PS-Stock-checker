@@ -199,21 +199,45 @@ class Controller {
 }
 
 async function hotLoop(checker: StockChecker, state: StateManager, ctl: Controller): Promise<void> {
-  // Grows on rate-limited sweeps, resets on a clean one - see hotBackoffMaxSeconds.
+  // Doubles on a rate-limited sweep, halves back down only after a run of
+  // clean ones - see hotBackoffMaxSeconds / hotRecoveryCleanSweeps.
   let intervalSeconds = config.hotIntervalSeconds;
+  let cleanSweeps = 0;
+  // Ratchets up every time a given rate proves too fast, and recovery never
+  // steps below it. Without this the loop cannot converge: halving always
+  // walks back to the configured base, and if THAT base is what the IP
+  // rejects, it just re-trips forever (verified by simulation - the observed
+  // 60->120->60 sawtooth becomes 90->180->180->90 rather than settling).
+  // Remembering the failed rate, plus a margin, lets the interval climb until
+  // it finds a level this connection actually tolerates and then stay there.
+  let floorSeconds = config.hotIntervalSeconds;
 
   while (!ctl.shuttingDown) {
     try {
       const { changed, rateLimited } = await runHotSweep(checker, state);
 
       if (rateLimited) {
+        cleanSweeps = 0;
+        // This rate is now known-bad, so never recover back down to it.
+        floorSeconds = Math.min(
+          Math.max(floorSeconds, Math.round(intervalSeconds * 1.25)),
+          config.hotBackoffMaxSeconds
+        );
         intervalSeconds = Math.min(intervalSeconds * 2, config.hotBackoffMaxSeconds);
-        logger.warn("Hot tier is being rate-limited, backing off", { nextIntervalSeconds: intervalSeconds });
-      } else if (intervalSeconds !== config.hotIntervalSeconds) {
-        logger.info("Hot tier recovered, restoring normal interval", {
-          intervalSeconds: config.hotIntervalSeconds,
+        logger.warn("Hot tier is being rate-limited, backing off", {
+          nextIntervalSeconds: intervalSeconds,
+          floorSeconds,
         });
-        intervalSeconds = config.hotIntervalSeconds;
+      } else if (intervalSeconds > floorSeconds) {
+        cleanSweeps++;
+        if (cleanSweeps >= config.hotRecoveryCleanSweeps) {
+          cleanSweeps = 0;
+          intervalSeconds = Math.max(Math.round(intervalSeconds / 2), floorSeconds);
+          logger.info("Hot tier steady, easing the interval back down", {
+            nextIntervalSeconds: intervalSeconds,
+            floorSeconds,
+          });
+        }
       }
 
       if (changed) {

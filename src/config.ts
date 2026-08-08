@@ -58,12 +58,19 @@ export const config = {
   //
   // MEASURED 2026-08-08, and the reason these defaults are not more
   // aggressive: a 30s interval at concurrency 4 got the hot tier HTTP 429'd
-  // by Blinkit on its SECOND sweep. The 28 hot targets are only 2 distinct
-  // product endpoints (one per SKU) fetched 14 times each with different
-  // lat/lon headers, so a sweep lands 14 hits on the same URL within seconds
-  // - which is what trips the limit, not the target count itself. 60s at
-  // concurrency 2 keeps the sustained rate near 0.5 req/s.
-  hotIntervalSeconds: optionalInt("HOT_INTERVAL_SECONDS", 60),
+  // by Blinkit on its SECOND sweep. The hot targets are only 2 distinct
+  // product endpoints (one per SKU) fetched once per pincode with different
+  // lat/lon headers, so a sweep lands N hits on the same URL within seconds
+  // - which is what trips the limit, not the target count itself.
+  //
+  // 60 was the first value tried and is NOT enough. A second machine ran it
+  // for ~8 minutes and settled into a sawtooth: 2-3 clean sweeps, then a
+  // sweep with 11 of 32 rate-limited, back off, recover, trip again. Blinkit's
+  // limit is per-IP and the tolerance differs per connection, so this default
+  // is set above the highest rate BOTH observed machines sustained rather
+  // than at the edge of the more permissive one. Lower it per-machine via the
+  // env var if a given IP proves it can take more.
+  hotIntervalSeconds: optionalInt("HOT_INTERVAL_SECONDS", 90),
   coldIntervalMinutes: optionalInt("COLD_INTERVAL_MINUTES", 5),
   // How many hot-tier checks may be in flight at once. Deliberately small:
   // Blinkit sits behind Cloudflare bot management (see CheckStrategy in
@@ -79,9 +86,21 @@ export const config = {
   // which is exactly how the 429 above was provoked.
   hotJitterPercent: optionalInt("HOT_JITTER_PERCENT", 20),
   // When a sweep comes back mostly rate-limited, the interval doubles (up to
-  // this ceiling) and only resets after a clean sweep - so a rate-limit spike
-  // backs off instead of hammering through it.
+  // this ceiling) so a rate-limit spike backs off instead of hammering
+  // through it.
   hotBackoffMaxSeconds: optionalInt("HOT_BACKOFF_MAX_SECONDS", 600),
+  // How many CONSECUTIVE clean sweeps are required before the interval steps
+  // back down, and it halves rather than resetting outright.
+  //
+  // Backing off must be fast but recovering must not be: the first version
+  // reset straight to the base interval after ONE clean sweep, which put it
+  // back at the exact rate that had just been limited, and it re-tripped
+  // within 2-3 sweeps. Observed live 2026-08-08 as a 60->120->60->120
+  // sawtooth. Halving after two clean sweeps lets the interval settle on
+  // whatever the current IP actually tolerates instead of oscillating around
+  // it - and means a machine on a stricter connection self-tunes rather than
+  // needing its own HOT_INTERVAL_SECONDS.
+  hotRecoveryCleanSweeps: optionalInt("HOT_RECOVERY_CLEAN_SWEEPS", 2),
 
   // When true, run a single check cycle and exit instead of looping forever.
   // Used when the scheduling itself is external (e.g. a GitHub Actions cron).
