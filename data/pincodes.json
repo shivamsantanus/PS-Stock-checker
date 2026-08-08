@@ -138,5 +138,25 @@
     "relianceDigital": false,
     "lat": 12.898773,
     "lon": 77.5764094
+  },
+  {
+    "id": "560054",
+    "pincode": "560054",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false,
+    "lat": 13.0346622,
+    "lon": 77.55720529999999
+  },
+  {
+    "id": "560092",
+    "pincode": "560092",
+    "city": "Bangalore",
+    "searchText": "",
+    "quickCommerce": true,
+    "relianceDigital": false,
+    "lat": 13.064103699999999,
+    "lon": 77.5931209
   }
 ]
