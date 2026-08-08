@@ -6,6 +6,7 @@ import { StateManager } from "./stateManager";
 import { StockChecker } from "./scraper";
 import { hasAnyChannelConfigured, notifyBackInStock, notifyComingSoon, notifyError } from "./notifier";
 import { detectPhantomStock } from "./phantomDetection";
+import { loadPincodeEntriesSync } from "./pincodeStore";
 import { StockResult, Target } from "./types";
 
 function sleep(ms: number): Promise<void> {
@@ -61,7 +62,12 @@ async function runCheckCycle(checker: StockChecker, state: StateManager): Promis
     await sleep(delay);
   }
 
-  const phantomWarnings = detectPhantomStock(rdResults);
+  // Read the pincode file fresh here rather than reusing a value captured at
+  // startup: detectPhantomStock needs each pincode's coordinates to measure
+  // how far the fulfilling store is, and a stale copy would silently disable
+  // the distance rule for any row whose lat/lon was filled in by
+  // `npm run resolve-latlon` while this process was running.
+  const phantomWarnings = detectPhantomStock(rdResults, loadPincodeEntriesSync());
   for (const result of rdResults) {
     result.phantomWarning = phantomWarnings.get(result.target.id);
     await handleCheckResult(state, result.target, result);

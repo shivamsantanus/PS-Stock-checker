@@ -229,6 +229,11 @@ function relianceDigitalTarget(opts: {
     // reader's only defense against phantom retail-store stock, see the
     // KNOWN LIMIT note above.
     detailJsonPath: "store",
+    // The same offer's `long_lat` ([lon, lat] of the fulfilling store) is
+    // captured for detectPhantomStock rather than shown - a raw coordinate
+    // pair means nothing to someone reading an alert, but the distance from
+    // it to this pincode is the strongest phantom signal available anonymously.
+    contextJsonPaths: ["long_lat"],
   };
 }
 
@@ -483,14 +488,21 @@ const AMAZON_PS5_LISTINGS: { idSuffix: string; label: string; asin: string }[] =
 const PINCODE_ENTRIES = loadPincodeEntriesSync();
 
 /**
- * The 2 Reliance Digital targets (per SKU) for one pincode entry - see the
+ * The 3 Reliance Digital targets (per SKU) for one pincode entry - see the
  * relianceDigitalTarget factory above for the verified per-pincode contract.
  *
- * The third SKU, `sony-playstation-5-digital-edition-console` (the original
- * pre-Slim Digital Edition), was REMOVED 2026-08-07: it is a discontinued
- * console generation, and its live price probe confirmed it as the oldest
- * price tier still listed anywhere (MRP 44,990 vs 54,990/49,990 for the two
- * Slim SKUs kept below). Only current-generation MRPs are tracked now.
+ * A now-removed SKU, `sony-playstation-5-digital-edition-console` (the
+ * original pre-Slim Digital Edition), was dropped 2026-08-07: it is a
+ * discontinued console generation, and its live price probe confirmed it as
+ * the oldest price tier still listed anywhere (MRP 44,990 vs 54,990/49,990
+ * for the two Slim SKUs). Only current-generation MRPs are tracked now.
+ *
+ * `ps5-standard-e-chassis` (CFI-2116A01Y, MRP 69,990) was ADDED 2026-08-07
+ * after the user flagged it as RD's current standard-console listing. It is a
+ * genuinely DIFFERENT product from the two Slim SKUs, not a re-slug of one -
+ * live-verified via the v1.0 product endpoint, which reports Model
+ * CFI-2116A01Y against the Slims' CFI-2008A01X / CFI-2008B01X, and all three
+ * slugs answer 200 concurrently. So it is added alongside them, not swapped in.
  */
 function relianceDigitalPincodeTargets(entry: PincodeEntry): Target[] {
   const { pincode, city } = entry;
@@ -506,6 +518,13 @@ function relianceDigitalPincodeTargets(entry: PincodeEntry): Target[] {
       idSuffix: "ps5-slim-digital",
       label: "PS5 Slim Digital Console",
       slug: "sony-playstation-ps5-slim-digital-console-luh1rv-7537999",
+      pincode,
+      city,
+    }),
+    relianceDigitalTarget({
+      idSuffix: "ps5-standard-e-chassis",
+      label: "PS5 Standard Console CFI-2116A01Y (E-chassis)",
+      slug: "sony-ps5-standard-sa-e-chassis-gaming-console-mmeqbt-9974618",
       pincode,
       city,
     }),
@@ -895,7 +914,8 @@ export const buildAllTargets = (entries: PincodeEntry[]): Target[] => [
   // fanned out per pincode - pre-order eligibility isn't pincode-dependent).
   // All read `pre_order_enabled: false` at wiring time. The pre-Slim
   // `sony-playstation-5-digital-edition-console` watch was dropped alongside
-  // its stock target on 2026-08-07 - see relianceDigitalPincodeTargets above.
+  // its stock target on 2026-08-07, and the CFI-2116A01Y watch added the same
+  // day alongside its - see relianceDigitalPincodeTargets above.
   // -------------------------------------------------------------------------
   relianceDigitalPreOrderTarget({
     idSuffix: "ps5-slim",
@@ -906,6 +926,11 @@ export const buildAllTargets = (entries: PincodeEntry[]): Target[] => [
     idSuffix: "ps5-slim-digital",
     label: "PS5 Slim Digital Console",
     slug: "sony-playstation-ps5-slim-digital-console-luh1rv-7537999",
+  }),
+  relianceDigitalPreOrderTarget({
+    idSuffix: "ps5-standard-e-chassis",
+    label: "PS5 Standard Console CFI-2116A01Y (E-chassis)",
+    slug: "sony-ps5-standard-sa-e-chassis-gaming-console-mmeqbt-9974618",
   }),
 
   // --- Croma, added 2026-07-15 alongside Reliance Digital - "api" strategy

@@ -78,7 +78,7 @@ export const PLATFORMS: PlatformInfo[] = [
   {
     id: "reliancedigital",
     label: "Reliance Digital",
-    description: "2 SKUs per Reliance-Digital-enabled pincode, plus 2 pre-order watches. Alerts here can be phantom store stock - verify before celebrating.",
+    description: "3 SKUs per Reliance-Digital-enabled pincode, plus 3 pre-order watches. Alerts here can be phantom store stock - the alert says how far the fulfilling store is, verify before celebrating.",
     emoji: "🏬",
     perPincode: true,
   },

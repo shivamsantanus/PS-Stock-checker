@@ -139,7 +139,7 @@ pincode without touching any `.ts` file. Only the two per-location stores use
 this list: Blinkit and Reliance Digital. It reads and writes
 `data/pincodes.json` directly; `src/targets.ts` loads that same file at
 startup to build the actual target list, so every pincode row becomes 2
-Blinkit targets and, if you also check the "Reliance Digital" box, 2 more.
+Blinkit targets and, if you also check the "Reliance Digital" box, 3 more.
 
 Exactly one row (560001) has the Reliance Digital box ticked. That single row
 is the only thing generating RD targets — untick it everywhere and RD
@@ -275,6 +275,23 @@ done while building this — not guesses:
   read "Source:" in the alert — a mall-store source may be display/reserved
   units that fail at payment; treat every RD alert as "go try immediately,"
   not a guarantee.
+  **Phantom mitigation — store distance, added 2026-08-07.** The offer body
+  also carries `long_lat`, the fulfilling store's coordinates (in
+  `[longitude, latitude]` order). `src/phantomDetection.ts` measures that
+  against the coordinates of the pincode actually being asked about and flags
+  anything over 150km, which downgrades the alert to "⚠️ SUSPECTED STOCK
+  (unconfirmed)" with the distance spelled out. This replaced a guard that
+  could never fire in the current setup: the original rule compared the
+  fulfilling store across *two* pincodes, so with only 560001 ticked for RD
+  it had nothing to compare and silently did nothing. Both rules now run —
+  the distance rule needs just one result, and also catches the case the
+  cross-pincode rule structurally cannot see at any scale (a store far from
+  *every* tracked pincode fulfils them all "consistently"). Measured live on
+  2026-08-07 against all three SKUs from 560001: Mantri Bangalore 2km (clean,
+  no warning), Rudrampeta/Anantapur 189km and Dr. AS Rao Nagar/Hyderabad
+  511km (both flagged). Nothing is ever suppressed — a flagged result still
+  alerts, just without the confident framing, since a distant store could
+  still be a genuine regional warehouse.
   **Pre-order watch, added 2026-07-16:** re-verified TAT/distance/
   delivery-promise are still null/absent. Separately found the real catalog
   product-detail endpoint is v1.0, not v2.0 (v2.0 404s) — its
@@ -283,6 +300,12 @@ done while building this — not guesses:
   phones). One target per SKU watches this (not fanned per pincode — it's a
   product attribute, not a deliverability check). Dormant for all 3 PS5
   SKUs today (`pre_order_enabled: false`).
+  **SKUs tracked (3, as of 2026-08-07):** PS5 Slim Disc (CFI-2008A01X,
+  ₹54,990), PS5 Slim Digital (CFI-2008B01X, ₹49,990), and PS5 Standard
+  "SA E-chassis" (CFI-2116A01Y, ₹69,990 — added 2026-08-07). The last is a
+  distinct product, not a re-slug: the v1.0 endpoint reports its Model as
+  CFI-2116A01Y and all three slugs answer 200 at the same moment. The
+  pre-Slim Digital Edition was dropped the same day as discontinued.
 - **Croma — verified via internal API, high confidence,
   location-independent in practice.** The website itself hard-blocks
   automation (Akamai edge 403 on every non-headful load — curl, axios, and

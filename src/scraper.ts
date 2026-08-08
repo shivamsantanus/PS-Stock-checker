@@ -151,7 +151,7 @@ export class StockChecker {
   async check(target: Target): Promise<StockResult> {
     const checkedAt = new Date().toISOString();
     try {
-      let status: { status: StockStatus; detail: string };
+      let status: { status: StockStatus; detail: string; context?: Record<string, unknown> };
       if (target.strategy === "dom") {
         status = await this.checkDom(target);
       } else if (target.strategy === "browser-api") {
@@ -159,7 +159,7 @@ export class StockChecker {
       } else {
         status = await this.checkApi(target);
       }
-      return { target, status: status.status, checkedAt, detail: status.detail };
+      return { target, status: status.status, checkedAt, detail: status.detail, context: status.context };
     } catch (err: any) {
       logger.error(`Check failed for target "${target.id}"`, { error: err.message });
       return { target, status: "UNKNOWN", checkedAt, error: err.message };
@@ -356,7 +356,10 @@ export class StockChecker {
    * Turns a parsed JSON body into a status + detail, for both the plain-axios
    * and in-browser API paths (they differ only in how the bytes were fetched).
    */
-  private interpretJson(data: unknown, target: Target): { status: StockStatus; detail: string } {
+  private interpretJson(
+    data: unknown,
+    target: Target
+  ): { status: StockStatus; detail: string; context?: Record<string, unknown> } {
     if (target.jsonFind) {
       const foundText = resolveJsonFind(data, target.jsonFind);
       // Throwing (rather than falling through to the OUT_OF_STOCK default)
@@ -393,6 +396,19 @@ export class StockChecker {
       }
     }
 
-    return { status: resolveStatus(rawText, target), detail };
+    // contextJsonPaths (optional) captures raw values for post-check analysis
+    // rather than for display - see Target.contextJsonPaths. A missing path is
+    // simply absent from the map: these are supplementary signals, and a
+    // response that legitimately lacks one (Reliance Digital's `{}`
+    // not-deliverable body has no long_lat) must not fail the whole check.
+    let context: Record<string, unknown> | undefined;
+    for (const contextPath of target.contextJsonPaths ?? []) {
+      const contextValue = resolveJsonPath(data, contextPath);
+      if (contextValue === undefined) continue;
+      context = context ?? {};
+      context[contextPath] = contextValue;
+    }
+
+    return { status: resolveStatus(rawText, target), detail, context };
   }
 }

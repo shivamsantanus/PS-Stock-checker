@@ -168,6 +168,14 @@ export interface Target {
   // Digital's fulfilling store, since a mall-store-sourced offer can still
   // be rejected as phantom inventory at payment time.
   detailJsonPath?: string;
+  // api strategy only, optional: extra dot-paths whose raw values are captured
+  // onto StockResult.context for POST-CHECK ANALYSIS - unlike detailJsonPath
+  // these never reach a notification, so use them for machine-readable fields
+  // a later stage needs but a human reading an alert does not. Currently: the
+  // Reliance Digital targets capture `long_lat` (the fulfilling store's
+  // coordinates) so detectPhantomStock can measure how far that store is from
+  // the pincode actually being asked about - see phantomDetection.ts.
+  contextJsonPaths?: string[];
   // Optional label for the detailJsonPath line in notifications (defaults to
   // "Source"). Use when the extracted detail isn't a store/origin - e.g.
   // Games The Shop exposes a live unit count, where "Source: 5" would read
@@ -209,11 +217,14 @@ export interface StockResult {
   checkedAt: string; // ISO timestamp
   detail?: string; // raw matched text, for debugging
   error?: string;
+  // Raw values pulled from the response by Target.contextJsonPaths - input for
+  // post-check analysis (detectPhantomStock), never shown in an alert.
+  context?: Record<string, unknown>;
   // Set post-check by detectPhantomStock (see phantomDetection.ts) when an
   // IN_STOCK read is suspected to be Reliance Digital's phantom store-stock
-  // failure mode (a fulfilling store repeated across pincodes too far apart
-  // to plausibly share a store) - downgrades the alert's framing without
-  // changing `status` itself.
+  // failure mode (a fulfilling store that is implausibly far from the pincode
+  // asked about, or one repeated across pincodes too far apart to share a
+  // store) - downgrades the alert's framing without changing `status` itself.
   phantomWarning?: string;
 }
 
