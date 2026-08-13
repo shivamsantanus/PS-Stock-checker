@@ -122,7 +122,8 @@ export type Platform =
   | "croma"
   | "flipkart"
   | "gamestheshop"
-  | "reliancedigital";
+  | "reliancedigital"
+  | "zepto";
 
 /**
  * A single location to monitor. `url` is the page (dom strategy) or

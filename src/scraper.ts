@@ -6,10 +6,37 @@ import { config } from "./config";
 import { logger } from "./logger";
 import { InStockConfirmation, JsonFind, StockResult, StockStatus, Target } from "./types";
 
+/**
+ * Headers for the axios ("api") path only - a bare HTTP client sends nothing
+ * browser-like on its own, so it has to spell these out.
+ */
 const COMMON_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
   "Upgrade-Insecure-Requests": "1",
+};
+
+/**
+ * What a browser context may override - deliberately ONLY Accept-Language.
+ *
+ * Playwright applies extraHTTPHeaders to EVERY request the page makes, not
+ * just the top-level navigation. A real browser varies `Accept` by request
+ * type and sends `Upgrade-Insecure-Requests: 1` on navigations only - never
+ * on XHR/fetch - so forcing COMMON_HEADERS here stamped an impossible
+ * combination on every API call the page made.
+ *
+ * Zepto (AWS WAF) fingerprints exactly that: with `Upgrade-Insecure-Requests`
+ * forced on all requests, every page load was served the WAF JS challenge
+ * instead of the product page, so the location picker never rendered and each
+ * target failed on its first pre-action. Bisected header-by-header
+ * 2026-08-13: Accept-Language alone and Accept alone both load fine,
+ * Upgrade-Insecure-Requests alone reproduces the challenge 100%.
+ *
+ * Chromium already sends correct Accept and Upgrade-Insecure-Requests values
+ * per request type, so there is nothing to replace them with.
+ */
+const BROWSER_CONTEXT_HEADERS = {
+  "Accept-Language": "en-US,en;q=0.9",
 };
 
 function containsAny(text: string, values: string[]): boolean {
@@ -176,7 +203,7 @@ export class StockChecker {
     const context = await this.browser.newContext({
       userAgent: config.userAgent,
       locale: "en-IN",
-      extraHTTPHeaders: COMMON_HEADERS,
+      extraHTTPHeaders: BROWSER_CONTEXT_HEADERS,
     });
     const page = await context.newPage();
     // Only needs to reach "a document on this origin exists" - the fetches
@@ -256,7 +283,7 @@ export class StockChecker {
       context = await this.browser.newContext({
         userAgent: config.userAgent,
         locale: "en-US",
-        extraHTTPHeaders: COMMON_HEADERS,
+        extraHTTPHeaders: BROWSER_CONTEXT_HEADERS,
       });
 
       if (target.cookies?.length) {

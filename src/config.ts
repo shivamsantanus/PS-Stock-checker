@@ -72,6 +72,14 @@ export const config = {
   // env var if a given IP proves it can take more.
   hotIntervalSeconds: optionalInt("HOT_INTERVAL_SECONDS", 90),
   coldIntervalMinutes: optionalInt("COLD_INTERVAL_MINUTES", 5),
+  // How many cold-tier checks may be in flight at once. Sequential, the cold
+  // sweep runs ~13 minutes (50 DOM renders, most of them Zepto's scripted
+  // location-picker waits) - longer than the CI job timeout, which is why
+  // every scheduled run was being cancelled mid-cycle. Kept low because these
+  // are full page renders: the sweep is interleaved across retailers (see
+  // interleaveByPlatform) so a small number in flight still means roughly one
+  // request per site at a time, not a burst at any single one.
+  coldConcurrency: optionalInt("COLD_CONCURRENCY", 3),
   // How many hot-tier checks may be in flight at once. Deliberately small:
   // Blinkit sits behind Cloudflare bot management (see CheckStrategy in
   // types.ts), and firing many at once looks far more like a scraper than a
@@ -122,6 +130,9 @@ export const config = {
   // its markup" apart from "got served a bot-detection/CAPTCHA page" without
   // eyeballing a live browser. CI uploads this directory as a build artifact.
   debugDir: path.resolve(process.cwd(), process.env.DEBUG_DIR || "./data/debug"),
+
+  // How long a stored status stays believable - see getPreviousStatus.
+  stateStaleAfterHours: optionalInt("STATE_STALE_AFTER_HOURS", 24),
 
   logLevel: (process.env.LOG_LEVEL || "info") as "debug" | "info" | "warn" | "error",
 

@@ -82,6 +82,13 @@ export const PLATFORMS: PlatformInfo[] = [
     emoji: "🏬",
     perPincode: true,
   },
+  {
+    id: "zepto",
+    label: "Zepto",
+    description: "2 console SKUs per pincode. Costs a full page render each (no API path), so switching this off is the quickest way to shorten a cycle.",
+    emoji: "⚡",
+    perPincode: true,
+  },
 ];
 
 /** Switch map as stored on disk: every platform id -> enabled. */

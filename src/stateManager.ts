@@ -35,8 +35,34 @@ export class StateManager {
     }
   }
 
+  /**
+   * A status the checker hasn't managed to refresh in over
+   * `stateStaleAfterHours` is reported as UNKNOWN rather than believed.
+   *
+   * Why: entries are never pruned, and a failed check skips the state update
+   * entirely (see handleCheckResult) - so a target that breaks, or is removed
+   * from targets.ts, while its last good read was IN_STOCK keeps that IN_STOCK
+   * forever. The transition test that fires alerts is `previous !== "IN_STOCK"`,
+   * so when such a target comes back it reads IN_STOCK -> IN_STOCK and alerts
+   * nobody. That is exactly how Zepto's 2026-08-13 relist went unalerted:
+   * entries last written 2026-07-15 still claimed IN_STOCK.
+   *
+   * Targets checked on a normal cycle refresh well inside the window, so this
+   * never re-fires an alert for stock that has simply stayed available.
+   */
   getPreviousStatus(targetId: string): StockStatus {
-    return this.state[targetId]?.status ?? "UNKNOWN";
+    const entry = this.state[targetId];
+    if (!entry) return "UNKNOWN";
+
+    const ageMs = Date.now() - new Date(entry.lastCheckedAt).getTime();
+    if (ageMs > config.stateStaleAfterHours * 3_600_000) {
+      logger.info(`Ignoring stale status for "${targetId}"`, {
+        status: entry.status,
+        lastCheckedAt: entry.lastCheckedAt,
+      });
+      return "UNKNOWN";
+    }
+    return entry.status;
   }
 
   async recordCheck(targetId: string, status: StockStatus): Promise<void> {

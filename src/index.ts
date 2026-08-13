@@ -43,6 +43,30 @@ async function mapWithConcurrency<T, R>(
 }
 
 /**
+ * Round-robins targets across platforms, so a concurrent sweep spreads its
+ * in-flight requests over different retailers instead of hitting one of them
+ * N times at once. Matters most for Zepto, which is more than half the cold
+ * tier and sits behind AWS WAF.
+ */
+function interleaveByPlatform(targets: Target[]): Target[] {
+  const queues = new Map<string, Target[]>();
+  for (const t of targets) {
+    const queue = queues.get(t.platform);
+    if (queue) queue.push(t);
+    else queues.set(t.platform, [t]);
+  }
+
+  const out: Target[] = [];
+  const lists = [...queues.values()];
+  for (let i = 0; out.length < targets.length; i++) {
+    for (const list of lists) {
+      if (i < list.length) out.push(list[i]);
+    }
+  }
+  return out;
+}
+
+/**
  * Fires the back-in-stock/coming-soon alerts and persists state for one
  * already-checked result. Returns true when this result represents a NEW
  * IN_STOCK or COMING_SOON transition - the hot tier uses that to escalate
@@ -147,14 +171,13 @@ async function runColdSweep(checker: StockChecker, state: StateManager): Promise
     await handleCheckResult(state, result.target, result);
   }
 
-  for (const target of otherTargets) {
+  await mapWithConcurrency(interleaveByPlatform(otherTargets), config.coldConcurrency, async (target) => {
+    // Small randomized pause before each check so requests don't fire in a
+    // suspiciously uniform burst.
+    await sleep(randomBetween(config.minDelayBetweenTargetsMs, config.maxDelayBetweenTargetsMs));
     const result = await checker.check(target);
     await handleCheckResult(state, target, result);
-
-    // Small randomized pause between hitting different targets so requests
-    // don't fire in a suspiciously uniform burst.
-    await sleep(randomBetween(config.minDelayBetweenTargetsMs, config.maxDelayBetweenTargetsMs));
-  }
+  });
 
   logger.info("Cold sweep complete", {
     targets: COLD_TARGETS.length,

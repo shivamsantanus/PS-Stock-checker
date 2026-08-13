@@ -1,49 +1,89 @@
-// InStockConfirmation is no longer imported here - the Zepto targets were its
-// only users (see the removal note below). The type and the scraper's support
-// for it are intentionally kept in place for the next pincode-gated site that
-// needs a positive "the location really applied" guard.
-import { Platform, Target } from "./types";
+import { InStockConfirmation, Platform, Target } from "./types";
 import { PincodeEntry, loadPincodeEntriesSync } from "./pincodeStore";
 import { loadPlatformSwitchesSync } from "./platformStore";
 
 /**
- * ZEPTO - REMOVED 2026-08-07. Zepto has delisted the PS5 console entirely:
- * both tracked product pages (pvid ad968d7d-... standard and 4dd0b8da-...
- * digital) now serve Zepto's 404 page ("The page you're looking for has made
- * an egg-sit"), and a live catalog search for "playstation" returns only
- * DualSense controllers, games and third-party accessories - no console in
- * any form. There is nothing left to point a target at.
+ * ZEPTO - removed 2026-08-07 when Zepto delisted the PS5 (both product pages
+ * served its 404 "egg-sit" page), RESTORED 2026-08-13 after it relisted both
+ * consoles at the SAME pvids as before. Everything below was re-verified live
+ * against the relisted pages on 2026-08-13, not just restored from git.
  *
- * This was not a small amount of dead weight: 66 targets (2 SKUs x 33
- * pincodes), each one clicking a location picker on a 404 page and burning
- * the full 30s Playwright timeout before failing, then writing a screenshot
- * + HTML dump to data/debug/. That is ~34 minutes of every check cycle spent
- * on pages that cannot ever report stock - the single biggest reason cycles
- * were being cut off by the CI job timeout before reaching the targets that
- * do work. data/debug/ held 212 Zepto failure dumps at removal time.
- *
- * TO RE-ADD IF ZEPTO RELISTS: the scraping approach itself was sound and is
- * preserved here, since nothing about it was wrong - only the products
- * vanished. Zepto's location picker DOES respond to headless automation:
- * click `[data-testid='user-address']` to open the modal, fill
+ * Zepto's location picker responds to headless automation: click
+ * `[data-testid='user-address']` to open the modal, fill
  * `[data-testid='address-search-input'] input`, then click the first
- * `[data-testid='address-search-item']` and wait ~7000ms - that generous
- * wait was load-bearing, because the DOM keeps showing the STALE default
- * "Add to Cart" for ~2.2s after the click and a shorter wait produced real
- * false alerts (live-verified 2026-07-08). The buy-box selector was the
- * hashed CSS-module class `.KQfnF.ckhcV`, matching "add to cart" for in
- * stock and "notify me"/"out of stock" against it.
+ * `[data-testid='address-search-item']`.
  *
- * Two IN_STOCK confirmation guards were also required (see InStockConfirmation
- * in types.ts) and would be needed again, because Zepto's default/no-location
- * view of an out-of-stock product shows the SAME "Add to Cart" CTA as a
- * genuinely in-stock store: (1) `[data-testid='user-address']` must no longer
- * read "select location", proving the picker applied, and (2) `header` must
- * match /\d+\s*min/, proving a serviceable dark store actually resolved -
- * Zepto renders a delivery ETA for any serviceable location but never on the
- * unresolved view. Both were live-verified 2026-07-14 across an in-stock
- * store, an out-of-stock serviceable store, and the default view.
+ * The ~7000ms wait after that click is LOAD-BEARING, not padding: the DOM
+ * keeps showing the STALE default "Add to Cart" for ~2.2s after the click,
+ * and a shorter wait produced real false alerts (live-verified 2026-07-08).
+ *
+ * WHY THE CONFIRMATION GUARDS ARE NOT OPTIONAL: Zepto's default/no-location
+ * view of an OUT OF STOCK product shows the exact same "Add to Cart" CTA as a
+ * genuinely in-stock store, so a naive read of the buy-box alone cannot tell
+ * them apart - re-confirmed 2026-08-13, where the no-location view of both
+ * consoles read "Add to Cart" while 13 of 17 pincodes were actually sold out.
  */
+const ZEPTO_IN_STOCK_CONFIRMATIONS: InStockConfirmation[] = [
+  // 1. The picker actually applied: the header address stops reading the
+  //    default "Select Location" prompt once a real address is set.
+  { selector: "[data-testid='user-address']", rejectAny: ["select location"] },
+  // 2. A serviceable dark store resolved: Zepto renders a delivery ETA
+  //    ("N minutes") for ANY serviceable location - in-stock or out-of-stock
+  //    alike - but never on the unresolved/default view.
+  { selector: "header", matches: "\\d+\\s*min" },
+];
+
+/**
+ * The PS5 SKUs Zepto lists. `pvid` is the product id in the page URL; both
+ * survived the delisting and came back unchanged.
+ */
+const ZEPTO_PS5_SKUS = [
+  {
+    idPrefix: "zepto-ps5",
+    labelSuffix: "",
+    slug: "playstation-5-console-standard",
+    pvid: "ad968d7d-c5d8-415e-b7d4-58f84ff13076",
+  },
+  {
+    idPrefix: "zepto-ps5-digital",
+    labelSuffix: " (Digital Edition)",
+    slug: "playstation-5-console-digital",
+    pvid: "4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
+  },
+] as const;
+
+type ZeptoSku = (typeof ZEPTO_PS5_SKUS)[number];
+
+function zeptoTarget(entry: PincodeEntry, sku: ZeptoSku): Target {
+  const { id, pincode, city } = entry;
+  return {
+    id: `${sku.idPrefix}-${id}`,
+    platform: "zepto",
+    label: `Zepto - ${city} ${pincode}${sku.labelSuffix}`,
+    url: `https://www.zepto.com/pn/${sku.slug}/pvid/${sku.pvid}`,
+    strategy: "dom",
+    preActions: [
+      { action: "click", selector: "[data-testid='user-address']" },
+      // searchText over the bare pincode where set, for the same reason as
+      // Blinkit: a bare pincode can resolve to more than one dark-store zone.
+      {
+        action: "fill",
+        selector: "[data-testid='address-search-input'] input",
+        value: entry.searchText || pincode,
+        waitAfterMs: 2000,
+      },
+      { action: "click", selector: "[data-testid='address-search-item']", waitAfterMs: 7000 },
+    ],
+    // Scoped to the buy-box only (title/price/CTA). A page-wide selector would
+    // false-positive on the "More from SONY" carousel, which renders its own
+    // "ADD" buttons for other products. This is a hashed CSS-module class that
+    // can rotate on a Zepto redeploy - re-verify if this target starts erroring.
+    selector: ".KQfnF.ckhcV",
+    outOfStockValues: ["notify me", "out of stock"],
+    inStockValues: ["add to cart"],
+    inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
+  };
+}
 
 /**
  * Builds the JSON body Croma's own PDP sends to its OMS delivery-promise
@@ -532,19 +572,16 @@ function relianceDigitalPincodeTargets(entry: PincodeEntry): Target[] {
 }
 
 /**
- * The 2 quick-commerce targets (Blinkit, x2 SKUs) for one pincode entry.
- * Blinkit is the ONLY quick-commerce platform left here - Zepto delisted the
- * PS5 console entirely and Swiggy Instamart is unreachable headless; both
- * were removed 2026-08-07, see their notes above and below. Uses
- * `entry.searchText`
- * instead of the bare pincode when set - needed because a bare-pincode
- * search on Zepto/Blinkit can resolve ambiguously to more than one
- * dark-store zone (live-verified case: pincode 560067/Kadugodi returned
- * multiple distinct locality suggestions serving different stores) - a
- * fuller address string makes the first suggestion clicked deterministically
- * the right store. `entry.id` (not the bare pincode) is the id suffix so
- * rows with a custom address get their own distinct target ids alongside a
- * plain-pincode row for the same pincode.
+ * The 4 quick-commerce targets for one pincode entry: Blinkit x2 SKUs and
+ * Zepto x2 SKUs. Swiggy Instamart remains out (unreachable headless, see its
+ * note below). Uses `entry.searchText` instead of the bare pincode when set -
+ * needed because a bare-pincode search on Zepto/Blinkit can resolve
+ * ambiguously to more than one dark-store zone (live-verified case: pincode
+ * 560067/Kadugodi returned multiple distinct locality suggestions serving
+ * different stores) - a fuller address string makes the first suggestion
+ * clicked deterministically the right store. `entry.id` (not the bare
+ * pincode) is the id suffix so rows with a custom address get their own
+ * distinct target ids alongside a plain-pincode row for the same pincode.
  */
 /**
  * The PS5 SKUs Blinkit lists. `prid` is both the product id in the page URL
@@ -699,9 +736,12 @@ function quickCommercePincodeTargets(entry: PincodeEntry): Target[] {
   // then it keeps working the slow way rather than silently dropping out of
   // the check list.
   const hasCoordinate = typeof entry.lat === "number" && typeof entry.lon === "number";
-  return BLINKIT_PS5_SKUS.map((sku) =>
-    hasCoordinate ? blinkitApiTarget(entry, sku) : blinkitDomTarget(entry, sku)
-  );
+  return [
+    ...BLINKIT_PS5_SKUS.map((sku) =>
+      hasCoordinate ? blinkitApiTarget(entry, sku) : blinkitDomTarget(entry, sku)
+    ),
+    ...ZEPTO_PS5_SKUS.map((sku) => zeptoTarget(entry, sku)),
+  ];
 }
 
 /**
@@ -959,14 +999,14 @@ export const buildAllTargets = (entries: PincodeEntry[]): Target[] => [
     productUrl: "https://www.croma.com/sony-playstation-5-slim-1tb-ssd-gaming-console-white-/p/305985",
   }),
 
-  // --- Quick-commerce (Blinkit; BigBasket, Flipkart Minutes, Swiggy
-  // Instamart and Zepto all removed 2026-08-07) ----------------------------
+  // --- Quick-commerce (Blinkit + Zepto; BigBasket, Flipkart Minutes and
+  // Swiggy Instamart removed 2026-08-07) -----------------------------------
   //
   // Unlike the mainstream retailers above, these DO gate real-time stock
   // behind a delivery pincode/address (they run dark-store fulfillment, not
   // one national inventory pool) - so per-city checks are meaningful here,
-  // via `preActions` driving each site's location picker. Blinkit is the only
-  // one left and is CONFIRMED WORKING (see its comments in
+  // via `preActions` driving each site's location picker. Blinkit and Zepto
+  // are both CONFIRMED WORKING (see their comments in
   // quickCommercePincodeTargets above); Instamart's location picker was
   // live-tested and found NOT to work headless (see its removal note above).
   //
@@ -987,8 +1027,8 @@ export const buildAllTargets = (entries: PincodeEntry[]): Target[] => [
   // Zepto targets below were built. See README.md -> "Quick-commerce
   // platforms" for per-platform feasibility notes.
 
-  // --- Quick-commerce pincodes (Blinkit only, since Zepto and Instamart were
-  // removed above), sourced from data/pincodes.json (quickCommerce: true
+  // --- Quick-commerce pincodes (Blinkit + Zepto), sourced from
+  // data/pincodes.json (quickCommerce: true
   // rows) - see the quickCommercePincodeTargets factory above for the per-row
   // target set and the searchText field's purpose. The pincode list was cut
   // back to Bangalore-only on 2026-08-07; the former Kadugodi / Jeevan Bheema

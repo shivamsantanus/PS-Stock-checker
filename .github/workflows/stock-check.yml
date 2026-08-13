@@ -16,7 +16,13 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Headroom over the real cycle cost, NOT a target to run up to. At 10
+    # minutes every scheduled run was cancelled part-way through "Run one
+    # check cycle", so whichever targets sat late in the cycle were never
+    # checked and could never alert. The cold sweep is the long pole (full
+    # page renders, most of them Zepto's scripted location-picker waits); it
+    # now runs at COLD_CONCURRENCY, which brings a cycle well under this.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
