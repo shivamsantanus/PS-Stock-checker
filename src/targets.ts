@@ -36,20 +36,23 @@ const ZEPTO_IN_STOCK_CONFIRMATIONS: InStockConfirmation[] = [
 /**
  * The PS5 SKUs Zepto lists. `pvid` is the product id in the page URL.
  *
- * DIGITAL EDITION DROPPED 2026-08-14 - it was a zombie listing, not real
- * stock. Its page (pvid 4dd0b8da-d86d-4d40-8ab9-8413ebeec4df, CFI-2008B01X,
- * MRP 49990) still rendered "Add to Cart" and would even add to a cart with a
- * real store and ETA, but that SKU is discontinued at that price, and a
- * catalog search of the very store serving it ("ps5", "ps5 console",
- * "playstation 5 console" against Hagadur/560066) returned 81 results with
- * ZERO console listings among them - only controllers, games and accessories.
- * The product is delisted from the catalog; only the direct PDP URL, which is
- * exactly what this checker hits, still resolves. Every alert it produced was
- * therefore noise. Restore by re-adding the entry below if it ever relists.
+ * DIGITAL EDITION DROPPED 2026-08-14, on price/desirability grounds ONLY:
+ * pvid 4dd0b8da-d86d-4d40-8ab9-8413ebeec4df, CFI-2008B01X, MRP 49990 - a
+ * discontinued SKU at an old price that is not worth being alerted about.
+ * Its stock reads were REAL, not phantom. Restore by re-adding the entry.
  *
- * NOTE: the standard edition is delisted from catalog search too, so if its
- * alerts ever start looking equally phantom, that is the first thing to
- * re-test (same three queries, same store).
+ * DO NOT use "absent from Zepto's catalog search" as evidence a listing is
+ * dead - that reasoning was tried on 2026-08-14 and is WRONG. Searching the
+ * serving store (Hagadur/560066) for "ps5", "ps5 console" and "playstation 5
+ * console" returns ~81 results with ZERO consoles among them, yet BOTH
+ * consoles were genuinely in stock that morning and both had sold out by
+ * 11:33 IST. Zepto just excludes consoles from general search; the direct PDP
+ * this checker hits is the only place they surface.
+ *
+ * The signal that a read is real, not a stale page: it VARIES - across stores
+ * (13 of 17 pincodes sold out while Hagadur had stock) and over time (both
+ * consoles flipping to "Notify Me when back in stock" within ~90 minutes). A
+ * genuinely dead page reads the same everywhere, forever.
  */
 const ZEPTO_PS5_SKUS = [
   {
