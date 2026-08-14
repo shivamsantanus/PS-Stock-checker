@@ -34,8 +34,22 @@ const ZEPTO_IN_STOCK_CONFIRMATIONS: InStockConfirmation[] = [
 ];
 
 /**
- * The PS5 SKUs Zepto lists. `pvid` is the product id in the page URL; both
- * survived the delisting and came back unchanged.
+ * The PS5 SKUs Zepto lists. `pvid` is the product id in the page URL.
+ *
+ * DIGITAL EDITION DROPPED 2026-08-14 - it was a zombie listing, not real
+ * stock. Its page (pvid 4dd0b8da-d86d-4d40-8ab9-8413ebeec4df, CFI-2008B01X,
+ * MRP 49990) still rendered "Add to Cart" and would even add to a cart with a
+ * real store and ETA, but that SKU is discontinued at that price, and a
+ * catalog search of the very store serving it ("ps5", "ps5 console",
+ * "playstation 5 console" against Hagadur/560066) returned 81 results with
+ * ZERO console listings among them - only controllers, games and accessories.
+ * The product is delisted from the catalog; only the direct PDP URL, which is
+ * exactly what this checker hits, still resolves. Every alert it produced was
+ * therefore noise. Restore by re-adding the entry below if it ever relists.
+ *
+ * NOTE: the standard edition is delisted from catalog search too, so if its
+ * alerts ever start looking equally phantom, that is the first thing to
+ * re-test (same three queries, same store).
  */
 const ZEPTO_PS5_SKUS = [
   {
@@ -43,12 +57,6 @@ const ZEPTO_PS5_SKUS = [
     labelSuffix: "",
     slug: "playstation-5-console-standard",
     pvid: "ad968d7d-c5d8-415e-b7d4-58f84ff13076",
-  },
-  {
-    idPrefix: "zepto-ps5-digital",
-    labelSuffix: " (Digital Edition)",
-    slug: "playstation-5-console-digital",
-    pvid: "4dd0b8da-d86d-4d40-8ab9-8413ebeec4df",
   },
 ] as const;
 
