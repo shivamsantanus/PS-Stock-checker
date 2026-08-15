@@ -3,4 +3,5 @@ dist/
 .env
 data/state.json
 data/debug/
+logs/
 *.log

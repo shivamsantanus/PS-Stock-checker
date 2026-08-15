@@ -8,6 +8,17 @@ export function hasAnyChannelConfigured(): boolean {
 }
 
 /**
+ * Central kill switch for outbound alerts (config.notifyEnabled). Returns true
+ * when the caller should stop and NOT send - logging the alert it would have
+ * sent, so a priming run still shows exactly what it suppressed.
+ */
+function suppressed(kind: string, summary: string): boolean {
+  if (config.notifyEnabled) return false;
+  logger.info(`NOTIFY_ENABLED=false - suppressed ${kind} alert`, { summary });
+  return true;
+}
+
+/**
  * Fires a Discord webhook message. Kept deliberately dumb - one HTTP POST,
  * no retries/queueing - because a stock alert only matters if it's fast,
  * and Discord webhooks are reliable enough for this use case.
@@ -115,6 +126,7 @@ async function postToTelegram(text: string): Promise<void> {
 
 export async function notifyBackInStock(result: StockResult): Promise<void> {
   const { target } = result;
+  if (suppressed("IN_STOCK", `${target.label}${result.resolvedLocation ? ` @ ${result.resolvedLocation}` : ""}`)) return;
   // Prefer the human-facing product page over a raw API endpoint - an alert
   // is for racing to buy, so the link must open something purchasable.
   const linkUrl = target.displayUrl ?? target.url;
@@ -167,6 +179,7 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
 
 export async function notifyComingSoon(result: StockResult): Promise<void> {
   const { target } = result;
+  if (suppressed("COMING_SOON", target.label)) return;
   const linkUrl = target.displayUrl ?? target.url;
 
   const discordEmbed = {
@@ -189,6 +202,7 @@ export async function notifyComingSoon(result: StockResult): Promise<void> {
 }
 
 export async function notifyError(message: string): Promise<void> {
+  if (suppressed("error", message)) return;
   await Promise.all([
     postToDiscord(`⚠️ Stock checker error: ${message}`),
     postToTelegram(`⚠️ Stock checker error: ${message}`),

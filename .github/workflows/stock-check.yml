@@ -1,10 +1,22 @@
 name: Stock check
 
 on:
-  schedule:
-    # GitHub may delay scheduled runs during high load - treat this as
-    # "roughly every 10 minutes", not a guarantee.
-    - cron: "*/10 * * * *"
+  # SCHEDULE DISABLED 2026-08-15 - the checker now runs persistently on the
+  # operator's Windows machine (scripts/run-checker.cmd, launched from the
+  # Startup folder), which is what makes the alerts realtime.
+  #
+  # Two reasons not to run both: every alert would be sent TWICE to
+  # subscribers, since each runner keeps its own state file and neither can
+  # see the other's transitions. And GitHub's scheduler was never fit for this
+  # anyway - measured over 12 consecutive runs it fired every ~27 min on
+  # average (39 min worst) despite asking for 10, because scheduled workflows
+  # are best-effort on shared runners.
+  #
+  # Kept as workflow_dispatch so it can still be triggered by hand as a
+  # fallback if the local machine is down for a while.
+  #
+  #   schedule:
+  #     - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
 # Prevent overlapping runs (e.g. a slow check still running when the next

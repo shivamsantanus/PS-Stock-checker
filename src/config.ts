@@ -114,6 +114,14 @@ export const config = {
   // Used when the scheduling itself is external (e.g. a GitHub Actions cron).
   runOnce: optionalBool("RUN_ONCE", false),
 
+  // When false, alerts are logged instead of sent. Use it to PRIME the state
+  // file after the checker has been down: every entry older than
+  // stateStaleAfterHours is treated as UNKNOWN, so the first sweep back would
+  // otherwise fire an alert for every target that is merely still in stock -
+  // a burst of stale notifications to a paying audience. Run one
+  // NOTIFY_ENABLED=false RUN_ONCE=true sweep first, then start for real.
+  notifyEnabled: optionalBool("NOTIFY_ENABLED", true),
+
   headless: optionalBool("HEADLESS", true),
   requestTimeoutMs: optionalInt("REQUEST_TIMEOUT_MS", 30_000),
 
