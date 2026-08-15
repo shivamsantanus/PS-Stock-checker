@@ -183,6 +183,17 @@ export interface Target {
   // as nonsense but "Units in stock: 5" is exactly what a buyer racing a
   // restock wants to know.
   detailLabel?: string;
+  // dom strategy only, optional: selector whose text is captured onto
+  // StockResult.resolvedLocation and appended to alerts as "Store".
+  //
+  // Why this is not cosmetic: a pincode does NOT identify a quick-commerce
+  // dark store. 560066 splits across at least three (Hagadur, Hoodi,
+  // Brookefield) that disagree about stock at the same moment, so an alert
+  // naming only the pincode cannot be acted on - the reader has no way to tell
+  // whether it applies to THEIR address. Twice now (Hagadur 2026-08-14,
+  // Shanthi Nagar 2026-08-15) that ambiguity was mistaken for a false alert.
+  // Naming the store makes a wrong-store alert obvious on sight.
+  detailSelector?: string;
   // Values (case-insensitive substring match) that count as "in stock" for this target.
   inStockValues: string[];
   // Optional: values that count as "out of stock", checked BEFORE inStockValues.
@@ -218,6 +229,11 @@ export interface StockResult {
   checkedAt: string; // ISO timestamp
   detail?: string; // raw matched text, for debugging
   error?: string;
+  // dom strategy only: text captured by Target.detailSelector - the delivery
+  // location the page actually resolved to. Kept separate from `detail` so the
+  // buy-box text stays in the logs for debugging while the alert shows the
+  // human the store the read applies to.
+  resolvedLocation?: string;
   // Raw values pulled from the response by Target.contextJsonPaths - input for
   // post-check analysis (detectPhantomStock), never shown in an alert.
   context?: Record<string, unknown>;

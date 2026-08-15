@@ -81,7 +81,14 @@ async function handleCheckResult(state: StateManager, target: Target, result: St
   }
 
   const previousStatus = state.getPreviousStatus(target.id);
-  logger.info(`Checked "${target.id}"`, { status: result.status, previousStatus, detail: result.detail });
+  logger.info(`Checked "${target.id}"`, {
+    status: result.status,
+    previousStatus,
+    detail: result.detail,
+    // Which dark store the read applies to - the single most useful field when
+    // someone reports "it alerted but there was nothing there".
+    ...(result.resolvedLocation ? { store: result.resolvedLocation } : {}),
+  });
 
   const justCameInStock = previousStatus !== "IN_STOCK" && result.status === "IN_STOCK";
   if (justCameInStock) {

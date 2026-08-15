@@ -178,7 +178,12 @@ export class StockChecker {
   async check(target: Target): Promise<StockResult> {
     const checkedAt = new Date().toISOString();
     try {
-      let status: { status: StockStatus; detail: string; context?: Record<string, unknown> };
+      let status: {
+        status: StockStatus;
+        detail: string;
+        context?: Record<string, unknown>;
+        resolvedLocation?: string;
+      };
       if (target.strategy === "dom") {
         status = await this.checkDom(target);
       } else if (target.strategy === "browser-api") {
@@ -186,7 +191,14 @@ export class StockChecker {
       } else {
         status = await this.checkApi(target);
       }
-      return { target, status: status.status, checkedAt, detail: status.detail, context: status.context };
+      return {
+        target,
+        status: status.status,
+        checkedAt,
+        detail: status.detail,
+        context: status.context,
+        resolvedLocation: status.resolvedLocation,
+      };
     } catch (err: any) {
       logger.error(`Check failed for target "${target.id}"`, { error: err.message });
       return { target, status: "UNKNOWN", checkedAt, error: err.message };
@@ -273,7 +285,9 @@ export class StockChecker {
     }
   }
 
-  private async checkDom(target: Target): Promise<{ status: StockStatus; detail: string }> {
+  private async checkDom(
+    target: Target
+  ): Promise<{ status: StockStatus; detail: string; resolvedLocation?: string }> {
     if (!this.browser) throw new Error("Browser not initialized - call init() first");
     if (!target.selector) throw new Error(`Target "${target.id}" uses "dom" strategy but has no selector`);
 
@@ -348,7 +362,15 @@ export class StockChecker {
         }
       }
 
-      return { status, detail: rawText };
+      // Which delivery location the page actually resolved to. Captured for
+      // every status, not just IN_STOCK, so the logs show it too - a pincode
+      // does not identify a dark store, and the store is what makes an alert
+      // actionable. See Target.detailSelector.
+      const resolvedLocation = target.detailSelector
+        ? (await readSelectorText(page, target.detailSelector)).replace(/\s+/g, " ").slice(0, 120) || undefined
+        : undefined;
+
+      return { status, detail: rawText, resolvedLocation };
     } catch (err) {
       if (page) await this.captureDebugArtifacts(page, target.id);
       throw err;

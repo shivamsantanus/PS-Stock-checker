@@ -125,6 +125,12 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
   const detailLabel = target.detailLabel ?? "Source";
   const detailLine = target.detailJsonPath && result.detail ? `\n${detailLabel}: ${result.detail}` : "";
 
+  // The dark store this read actually applies to (see Target.detailSelector).
+  // A pincode alone cannot be acted on: one pincode can span several stores
+  // that disagree about stock, so without this the reader cannot tell whether
+  // an alert covers THEIR address or one across the city.
+  const storeLine = result.resolvedLocation ? `\n📍 Store: ${result.resolvedLocation}` : "";
+
   // Downgraded framing when detectPhantomStock (see phantomDetection.ts)
   // flagged this read as a likely Reliance Digital phantom-store offer - the
   // status is still IN_STOCK for state-tracking purposes, but the alert
@@ -143,10 +149,11 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
       { name: "Status", value: result.status, inline: true },
       { name: "Checked at", value: result.checkedAt, inline: true },
       ...(target.detailJsonPath && result.detail ? [{ name: detailLabel, value: result.detail, inline: false }] : []),
+      ...(result.resolvedLocation ? [{ name: "📍 Store", value: result.resolvedLocation, inline: false }] : []),
       ...(result.phantomWarning ? [{ name: "⚠️ Confidence warning", value: result.phantomWarning, inline: false }] : []),
     ],
   };
-  const telegramText = `${emoji} *${headline}* — ${target.label}\n${linkUrl}${detailLine}${phantomLine}\nChecked at: ${result.checkedAt}`;
+  const telegramText = `${emoji} *${headline}* — ${target.label}\n${linkUrl}${detailLine}${storeLine}${phantomLine}\nChecked at: ${result.checkedAt}`;
 
   await Promise.all([
     postToDiscord(`${emoji} **${headline}** — ${target.label}`, discordEmbed),

@@ -90,6 +90,9 @@ function zeptoTarget(entry: PincodeEntry, sku: ZeptoSku): Target {
     // "ADD" buttons for other products. This is a hashed CSS-module class that
     // can rotate on a Zepto redeploy - re-verify if this target starts erroring.
     selector: ".KQfnF.ckhcV",
+    // Surfaces the dark store the pincode resolved to, e.g. "Varthuru -
+    // Varthuru, Bangalore". Same element the confirmation guards read.
+    detailSelector: "[data-testid='user-address']",
     outOfStockValues: ["notify me", "out of stock"],
     inStockValues: ["add to cart"],
     inStockConfirmations: ZEPTO_IN_STOCK_CONFIRMATIONS,
