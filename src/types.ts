@@ -249,6 +249,17 @@ export interface StateEntry {
   status: StockStatus;
   lastCheckedAt: string;
   lastChangedAt: string;
+  // How many checks IN A ROW have reported `status`. 1 means it just changed.
+  // The alert policy uses this to require a status to hold before announcing
+  // it - see comingSoonConfirmations in config.ts.
+  consecutiveCount?: number;
+  // What was last ANNOUNCED to the user, kept deliberately separate from what
+  // was last SEEN. Blinkit oscillated one SKU in and out of coming_soon 8
+  // times in two hours on 2026-08-22; with alerting driven straight off the
+  // observed status, every flip became its own Telegram message. These two
+  // fields are what let the notification policy be quieter than the data.
+  lastAlertedStatus?: StockStatus;
+  lastAlertedAt?: string;
 }
 
 export type StateMap = Record<string, StateEntry>;

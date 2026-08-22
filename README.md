@@ -527,10 +527,43 @@ Two things to know:
 
 ## How it avoids spam
 
-`data/state.json` stores the last known status per target. A notification
-only fires on an `OUT_OF_STOCK`/`UNKNOWN` -> `IN_STOCK` transition. Repeated
-checks while a target stays in stock (or stays out of stock) produce no
-notification, only a log line.
+`data/state.json` stores, per target, both the last status **seen** and the
+last status **announced**. Those are deliberately separate: alerting is a
+policy on top of the data, not a direct reading of it.
+
+Three gates stand between an observation and a message (see
+`announceIfWorthIt` in `src/index.ts`):
+
+1. **News** — the status must have changed since we last said something
+   (`lastChangedAt > lastAlertedAt`). This is what keeps a target that is
+   merely *still* in stock from being re-announced; a cooldown alone cannot
+   tell "still in stock" apart from "went out and came back".
+2. **Confirmation** — the status must have held for N checks in a row.
+3. **Cooldown** — the same status is not repeated within its window.
+
+The two alert kinds get **opposite** settings, because they are not the same
+kind of event:
+
+| | `IN_STOCK` | `COMING_SOON` |
+| --- | --- | --- |
+| Confirmations | **1** — fires on the first positive read | 2 (`COMING_SOON_CONFIRMATIONS`) |
+| Cooldown | 20 min (`IN_STOCK_ALERT_COOLDOWN_MINUTES`) | 6 h (`COMING_SOON_ALERT_COOLDOWN_MINUTES`) |
+
+`IN_STOCK` must **never** wait to be confirmed — it is a race, and the
+Blinkit window on 2026-08-08 was shorter than ten minutes, so even one extra
+check of delay can cost the console. Only a cooldown guards it.
+`COMING_SOON` is an early warning where nothing is buyable, so a couple of
+minutes of delay costs nothing and confirmation kills flicker at the source.
+
+**Why this exists.** On 2026-08-22 Blinkit oscillated one SKU in and out of
+`coming_soon` for two hours. The old rule was simply "alert when the status
+becomes COMING_SOON", so every flip produced its own Telegram message — 7 for
+pincode 560035 alone. Replayed against that exact pattern, the old rule sends
+8 messages and the new one sends **1**, while a real restock still alerts on
+the very first positive read.
+
+None of this changes how often targets are checked. It only changes what gets
+sent.
 
 Because the tiers run concurrently and the hot sweep checks several targets
 at once, every state write is serialized onto a single chain (see

@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { StateMap, StockStatus } from "./types";
+import { StateEntry, StateMap, StockStatus } from "./types";
 import { config } from "./config";
 import { logger } from "./logger";
 
@@ -54,8 +54,7 @@ export class StateManager {
     const entry = this.state[targetId];
     if (!entry) return "UNKNOWN";
 
-    const ageMs = Date.now() - new Date(entry.lastCheckedAt).getTime();
-    if (ageMs > config.stateStaleAfterHours * 3_600_000) {
+    if (this.isStale(entry)) {
       logger.info(`Ignoring stale status for "${targetId}"`, {
         status: entry.status,
         lastCheckedAt: entry.lastCheckedAt,
@@ -65,17 +64,69 @@ export class StateManager {
     return entry.status;
   }
 
-  async recordCheck(targetId: string, status: StockStatus): Promise<void> {
+  /** Whether a stored entry is too old to be believed - see getPreviousStatus. */
+  private isStale(entry: StateEntry): boolean {
+    const ageMs = Date.now() - new Date(entry.lastCheckedAt).getTime();
+    return ageMs > config.stateStaleAfterHours * 3_600_000;
+  }
+
+  /**
+   * Records one observation and reports how long this status has now held.
+   *
+   * `consecutiveCount` is how many checks IN A ROW have returned it (1 means
+   * it just changed), which the alert policy uses to require a status to
+   * settle before announcing it. A run is broken by a stale gap as well as by
+   * a different status: if the previous check was too long ago to trust, the
+   * streak restarts rather than counting across a blackout the checker cannot
+   * vouch for.
+   *
+   * `lastChangedAt` is returned so a caller can tell "this status is new
+   * since we last announced it" apart from "it has simply stayed this way".
+   * Without that distinction a cooldown alone would re-announce a target that
+   * is merely still in stock every time the cooldown lapsed.
+   */
+  async recordCheck(
+    targetId: string,
+    status: StockStatus
+  ): Promise<{ consecutiveCount: number; lastChangedAt: string }> {
     const now = new Date().toISOString();
     const previous = this.state[targetId];
-    const changed = !previous || previous.status !== status;
+    const statusChanged = !previous || previous.status !== status;
+    const runContinues = Boolean(previous) && !statusChanged && !this.isStale(previous);
+    const consecutiveCount = runContinues ? (previous.consecutiveCount ?? 1) + 1 : 1;
+    const lastChangedAt = statusChanged ? now : previous.lastChangedAt;
 
     this.state[targetId] = {
+      ...previous,
       status,
       lastCheckedAt: now,
-      lastChangedAt: changed ? now : previous.lastChangedAt,
+      lastChangedAt,
+      consecutiveCount,
     };
 
+    await this.persist();
+    return { consecutiveCount, lastChangedAt };
+  }
+
+  /**
+   * What was last ANNOUNCED for this target, which is deliberately not the
+   * same thing as what was last observed - see StateEntry.lastAlertedStatus.
+   */
+  getLastAlert(targetId: string): { status?: StockStatus; at?: string } {
+    const entry = this.state[targetId];
+    return { status: entry?.lastAlertedStatus, at: entry?.lastAlertedAt };
+  }
+
+  /**
+   * Called only once an alert has genuinely gone out. Notably NOT called when
+   * the notifier suppressed it (NOTIFY_ENABLED=false), so a priming run
+   * doesn't leave behind a cooldown for a message nobody received.
+   */
+  async recordAlert(targetId: string, status: StockStatus): Promise<void> {
+    const entry = this.state[targetId];
+    if (!entry) return;
+    entry.lastAlertedStatus = status;
+    entry.lastAlertedAt = new Date().toISOString();
     await this.persist();
   }
 

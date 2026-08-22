@@ -142,6 +142,27 @@ export const config = {
   // How long a stored status stays believable - see getPreviousStatus.
   stateStaleAfterHours: optionalInt("STATE_STALE_AFTER_HOURS", 24),
 
+  // --- Alert policy -------------------------------------------------------
+  // These throttle what gets SENT. Nothing here changes how often targets are
+  // checked, so a real restock is still detected on the normal cadence.
+  //
+  // The two alert kinds get deliberately opposite settings because they are
+  // not the same kind of event:
+  //
+  //   IN_STOCK is a race - someone has to buy the thing before it sells out,
+  //   and the Blinkit window on 2026-08-08 was shorter than ten minutes. It
+  //   must therefore fire on the FIRST positive read (confirmations of 1);
+  //   only a cooldown guards against a flapping listing machine-gunning the
+  //   group.
+  //
+  //   COMING_SOON is an early warning - nothing is buyable, so arriving a
+  //   couple of minutes later costs nothing. It can afford to wait for the
+  //   status to hold, which kills flicker at the source instead of merely
+  //   rate-limiting it.
+  comingSoonConfirmations: optionalInt("COMING_SOON_CONFIRMATIONS", 2),
+  comingSoonAlertCooldownMinutes: optionalInt("COMING_SOON_ALERT_COOLDOWN_MINUTES", 360),
+  inStockAlertCooldownMinutes: optionalInt("IN_STOCK_ALERT_COOLDOWN_MINUTES", 20),
+
   logLevel: (process.env.LOG_LEVEL || "info") as "debug" | "info" | "warn" | "error",
 
   userAgent:

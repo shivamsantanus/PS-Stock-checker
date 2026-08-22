@@ -90,18 +90,85 @@ async function handleCheckResult(state: StateManager, target: Target, result: St
     ...(result.resolvedLocation ? { store: result.resolvedLocation } : {}),
   });
 
-  const justCameInStock = previousStatus !== "IN_STOCK" && result.status === "IN_STOCK";
-  if (justCameInStock) {
-    await notifyBackInStock(result);
+  const { consecutiveCount, lastChangedAt } = await state.recordCheck(target.id, result.status);
+  return announceIfWorthIt(state, target, result, consecutiveCount, lastChangedAt);
+}
+
+/**
+ * Decides whether an observation is worth ANNOUNCING, and sends it if so.
+ *
+ * Alerting is a policy layered on top of state rather than a direct reading of
+ * it. The old test was simply `previousStatus !== "COMING_SOON"`, which is
+ * correct only while the upstream signal is stable. On 2026-08-22 Blinkit
+ * oscillated one SKU in and out of coming_soon for two hours and that test
+ * turned every single flip into its own Telegram message - 7 for one pincode.
+ *
+ * Three gates now stand between an observation and a message:
+ *
+ *   1. NEWS. `lastChangedAt > lastAlertedAt` means the status has genuinely
+ *      changed since we last spoke. This is what stops a target that is merely
+ *      STILL in stock from being re-announced every time the cooldown lapses -
+ *      a cooldown on its own cannot tell those two cases apart.
+ *   2. CONFIRMATION. The status must have held for `confirmations` checks in a
+ *      row. This filters flicker at the source rather than rate-limiting it.
+ *   3. COOLDOWN. Bounds the damage when something flaps slower than the
+ *      confirmation window, so the worst case is one message per window.
+ *
+ * IN_STOCK deliberately takes confirmations of 1 - see the alert policy block
+ * in config.ts for why it must never wait to be confirmed.
+ */
+async function announceIfWorthIt(
+  state: StateManager,
+  target: Target,
+  result: StockResult,
+  consecutiveCount: number,
+  lastChangedAt: string
+): Promise<boolean> {
+  const policy =
+    result.status === "IN_STOCK"
+      ? { confirmations: 1, cooldownMinutes: config.inStockAlertCooldownMinutes }
+      : result.status === "COMING_SOON"
+        ? {
+            confirmations: config.comingSoonConfirmations,
+            cooldownMinutes: config.comingSoonAlertCooldownMinutes,
+          }
+        : null;
+
+  // OUT_OF_STOCK/UNKNOWN are never announced - they are the resting state.
+  if (!policy) return false;
+
+  const lastAlert = state.getLastAlert(target.id);
+
+  // Gate 1: has anything changed since we last said something?
+  if (lastAlert.at && new Date(lastChangedAt) <= new Date(lastAlert.at)) return false;
+
+  // Gate 2: has it held long enough to be believed?
+  if (consecutiveCount < policy.confirmations) {
+    logger.info(`Holding ${result.status} alert for "${target.id}" until confirmed`, {
+      consecutiveCount,
+      needed: policy.confirmations,
+    });
+    return false;
   }
 
-  const justBecameComingSoon = previousStatus !== "COMING_SOON" && result.status === "COMING_SOON";
-  if (justBecameComingSoon) {
-    await notifyComingSoon(result);
+  // Gate 3: did we already say this recently?
+  if (lastAlert.status === result.status && lastAlert.at) {
+    const minutesSince = (Date.now() - new Date(lastAlert.at).getTime()) / 60_000;
+    if (minutesSince < policy.cooldownMinutes) {
+      logger.info(`Suppressing repeat ${result.status} alert for "${target.id}"`, {
+        minutesSinceLastAlert: Math.round(minutesSince),
+        cooldownMinutes: policy.cooldownMinutes,
+      });
+      return false;
+    }
   }
 
-  await state.recordCheck(target.id, result.status);
-  return justCameInStock || justBecameComingSoon;
+  const sent =
+    result.status === "IN_STOCK" ? await notifyBackInStock(result) : await notifyComingSoon(result);
+  if (!sent) return false;
+
+  await state.recordAlert(target.id, result.status);
+  return true;
 }
 
 // Targets are tiered by check cost, not by platform - see the tiered-polling

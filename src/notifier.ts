@@ -124,9 +124,9 @@ async function postToTelegram(text: string): Promise<void> {
   );
 }
 
-export async function notifyBackInStock(result: StockResult): Promise<void> {
+export async function notifyBackInStock(result: StockResult): Promise<boolean> {
   const { target } = result;
-  if (suppressed("IN_STOCK", `${target.label}${result.resolvedLocation ? ` @ ${result.resolvedLocation}` : ""}`)) return;
+  if (suppressed("IN_STOCK", `${target.label}${result.resolvedLocation ? ` @ ${result.resolvedLocation}` : ""}`)) return false;
   // Prefer the human-facing product page over a raw API endpoint - an alert
   // is for racing to buy, so the link must open something purchasable.
   const linkUrl = target.displayUrl ?? target.url;
@@ -175,11 +175,12 @@ export async function notifyBackInStock(result: StockResult): Promise<void> {
   logger.info(isSuspectedPhantom ? "Sent suspected-phantom-stock alert" : "Sent in-stock alert", {
     targetId: target.id,
   });
+  return true;
 }
 
-export async function notifyComingSoon(result: StockResult): Promise<void> {
+export async function notifyComingSoon(result: StockResult): Promise<boolean> {
   const { target } = result;
-  if (suppressed("COMING_SOON", target.label)) return;
+  if (suppressed("COMING_SOON", target.label)) return false;
   const linkUrl = target.displayUrl ?? target.url;
 
   const discordEmbed = {
@@ -199,6 +200,7 @@ export async function notifyComingSoon(result: StockResult): Promise<void> {
   ]);
 
   logger.info("Sent coming-soon alert", { targetId: target.id });
+  return true;
 }
 
 export async function notifyError(message: string): Promise<void> {
